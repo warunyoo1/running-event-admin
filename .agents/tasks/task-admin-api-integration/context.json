@@ -1,0 +1,30 @@
+﻿{
+    "project_type":  "Next.js 16.4.1 App Router admin (React 19, TS strict, plain fetch) at c:\\Project\\running-event-admin; backend Express/Mongo API at c:\\Project\\running-event-api (read-only)",
+    "language":  "TypeScript",
+    "build_system":  "npm; next build; rewrite /api/:path* -\u003e API_PROXY_TARGET baked at build time (next.config.ts)",
+    "test_framework":  "none (do not add); verification = typecheck, build, runtime HTTP checks",
+    "build_command":  "npm run build",
+    "test_command":  "npm run typecheck \u0026\u0026 npm run build",
+    "verification_instructions":  "See c:\\Project\\running-event-admin\\.agents\\tasks\\admin-api-integration-plan.md Step 7 and amendments A1-A7. Plan: c:\\Project\\running-event-admin\\.agents\\tasks\\admin-api-integration-plan.md ; design: c:\\Project\\running-event-admin\\.agents\\tasks\\admin-api-integration-design.md (amendments override).",
+    "snapshot_or_generated_files":  null,
+    "environment_constraints":  "NEVER contact http://14.207.142.107:4000. Verification API on :4010, admin dev on :3100, PowerShell guard sets API_PROXY_TARGET=http://localhost:4010 in same command. No worktree, NO git commits/add. .env.local untracked, never print secrets. Windows PowerShell; use absolute paths.",
+    "contribution_requirements":  "No new dependencies; no any; small modules; centralized constants; minimal comments; match existing UI components/CSS/Thai copy; no redesign; loading/error/empty states.",
+    "key_patterns":  "Existing UI in src/components/ui.tsx (Modal etc.), pages under src/app/(admin)/*/page.tsx are client pages using useDemo(); shell src/components/admin-shell.tsx; presentation helpers in src/features/admin/data.ts. API: {data,meta}, {error:{code,message,fields}}, cookie rr_admin_token, roles super_admin|reviewer|viewer.",
+    "relevant_files":  [
+                           "src/lib/api.ts (replace)",
+                           "src/features/admin/demo-store.tsx (delete)",
+                           "src/features/admin/data.ts",
+                           "src/features/admin/order-detail.tsx",
+                           "src/components/admin-shell.tsx",
+                           "src/components/ui.tsx",
+                           "src/app/layout.tsx",
+                           "src/app/(admin)/layout.tsx",
+                           "src/app/(admin)/**/page.tsx",
+                           "src/app/login/page.tsx",
+                           "next.config.ts",
+                           ".env.example",
+                           "docs/SYSTEM.md",
+                           "running-event-api/src/routes|validators|services|config/env.ts"
+                       ],
+    "directory_structure":  "src/app (routes), src/components, src/features/admin, src/lib; docs/; .agents/tasks (plan artifacts)"
+}

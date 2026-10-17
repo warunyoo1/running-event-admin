@@ -8,12 +8,9 @@ import {
   type KeyboardEvent,
 } from "react";
 import { Search, X, Inbox, type LucideIcon } from "lucide-react";
-import { useDemo } from "@/features/admin/demo-store";
-import {
-  statusLabels,
-  type OrderStatus,
-  type EventStatus,
-} from "@/features/admin/data";
+import { useScope } from "@/features/admin/scope-provider";
+import { statusLabels } from "@/features/admin/format";
+import type { EventStatus, OrderStatus } from "@/lib/api/types";
 
 export function handleTabKeys(event: KeyboardEvent<HTMLDivElement>) {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -53,8 +50,7 @@ export function PageHeading({
   action?: ReactNode;
   scope?: "event" | "global";
 }) {
-  const { events, eventId } = useDemo();
-  const selectedEvent = events.find((event) => event.id === eventId);
+  const { selectedEvent } = useScope();
   return (
     <div className="page-heading">
       <div>

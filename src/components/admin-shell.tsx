@@ -17,10 +17,19 @@ import {
   Menu,
   X,
   LogOut,
-  ArrowUpRight,
+  KeyRound,
   CircleHelp,
 } from "lucide-react";
-import { useDemo } from "@/features/admin/demo-store";
+import { useAuth } from "@/features/admin/auth-provider";
+import { useScope } from "@/features/admin/scope-provider";
+import { useToast } from "@/features/admin/toast-provider";
+import { useAsync } from "@/features/admin/use-async";
+import { isSuper } from "@/features/admin/permissions";
+import { roleLabels } from "@/features/admin/format";
+import { dashboardApi } from "@/lib/api";
+import { errorMessage } from "@/lib/api/errors";
+import { ALL_EVENTS } from "@/lib/constants";
+import { ChangePasswordModal } from "./change-password-modal";
 import { Modal } from "./ui";
 
 const navigation = [
@@ -51,21 +60,38 @@ const navigation = [
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { events, orders, eventId, setEventId, ready } = useDemo();
+  const { user, logout } = useAuth();
+  const notify = useToast();
+  const {
+    events,
+    eventId,
+    scopeEventId,
+    selectedEvent,
+    setEventId,
+    ready,
+    error: scopeError,
+  } = useScope();
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const sidebar = useRef<HTMLElement>(null);
   const currentPage = navigation.find((item) => item.href === pathname);
   const title = currentPage?.title ?? "รายละเอียด";
   const isGlobal = currentPage?.scope === "global";
-  const selectedEvent = events.find((event) => event.id === eventId);
   const scopeLabel = ready ? selectedEvent?.name ?? "งานวิ่งทั้งหมด" : "กำลังโหลดงาน…";
-  const waiting = orders.filter(
-    (order) =>
-      order.status === "slip_uploaded" &&
-      (eventId === "all" || order.eventId === eventId),
-  ).length;
+  const waiting =
+    useAsync(
+      (signal) => dashboardApi.getDashboard(scopeEventId, signal),
+      [scopeEventId, pathname],
+    ).data?.pendingReview ?? 0;
+  const initials = user.name.trim().slice(0, 2).toUpperCase();
+  const visibleNavigation = navigation.filter(
+    (item) => item.href !== "/users" || isSuper(user.role),
+  );
+  useEffect(() => {
+    if (scopeError) notify(scopeError);
+  }, [scopeError, notify]);
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname, title]);
@@ -114,8 +140,15 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       previous?.focus();
     };
   }, [menuOpen, mobile]);
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch (reason) {
+      notify(errorMessage(reason));
+    }
+  }
   function renderNavigation(scope: "event" | "global") {
-    return navigation
+    return visibleNavigation
       .filter((item) => item.scope === scope)
       .map(({ href, title: label, icon: Icon }) => (
         <Link
@@ -126,7 +159,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         >
           <Icon size={19} aria-hidden="true" />
           <span>{label}</span>
-        {href === "/slips" && ready && waiting > 0 && (
+          {href === "/slips" && waiting > 0 && (
             <span
               className="nav-count"
               aria-label={`${waiting} รายการรอตรวจในงานที่เลือก`}
@@ -187,7 +220,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               aria-describedby="event-scope-hint"
               title={scopeLabel}
             >
-              <option value="all">งานวิ่งทั้งหมด</option>
+              <option value={ALL_EVENTS}>งานวิ่งทั้งหมด</option>
               {events.map((event) => (
                 <option value={event.id} key={event.id}>
                   {event.name}
@@ -198,7 +231,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <ChevronDown size={15} aria-hidden="true" />
           </div>
           <p id="event-scope-hint" className="workspace-hint">
-            {eventId === "all"
+            {eventId === ALL_EVENTS
               ? "ดูข้อมูลรวมทุกงานวิ่ง"
               : "ดูข้อมูลเฉพาะงานที่เลือก"}
           </p>
@@ -216,18 +249,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {renderNavigation("global")}
         </nav>
         <div className="sidebar-bottom">
-          <div className="demo-card">
-            <span className="demo-indicator" />
-            พื้นที่สาธิต
-            <p>
-              ทดลองจัดการด้วยข้อมูลตัวอย่าง
-              <br />
-              ข้อมูลบันทึกในเบราว์เซอร์นี้
-            </p>
-            <button onClick={() => setHelpOpen(true)}>
-              เกี่ยวกับเวอร์ชันนี้ <ArrowUpRight size={14} aria-hidden="true" />
-            </button>
-          </div>
           <button
             className="nav-item help-button"
             onClick={() => setHelpOpen(true)}
@@ -235,14 +256,29 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <CircleHelp size={19} aria-hidden="true" />
             คำแนะนำการใช้งาน
           </button>
-          <Link className="profile" href="/login">
-            <span className="avatar">AD</span>
+          <div className="profile">
+            <span className="avatar">{initials}</span>
             <span>
-              <strong>ผู้ดูแลระบบ</strong>
-              <small>บัญชีสาธิต</small>
+              <strong>{user.name}</strong>
+              <small>{roleLabels[user.role]}</small>
             </span>
-            <LogOut size={17} aria-hidden="true" />
-          </Link>
+            <span className="profile-actions">
+              <button
+                className="icon-button"
+                aria-label="เปลี่ยนรหัสผ่าน"
+                onClick={() => setPasswordOpen(true)}
+              >
+                <KeyRound size={17} aria-hidden="true" />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="ออกจากระบบ"
+                onClick={handleLogout}
+              >
+                <LogOut size={17} aria-hidden="true" />
+              </button>
+            </span>
+          </div>
         </div>
       </aside>
       <div className="main-shell" inert={mobile && menuOpen}>
@@ -279,9 +315,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               )}
               <span>{isGlobal ? "ข้อมูลส่วนกลาง" : scopeLabel}</span>
             </span>
-            <span className="demo-pill">ข้อมูลสาธิต</span>
-            <span className="avatar small" aria-label="ผู้ดูแลระบบสาธิต">
-              AD
+            <span className="avatar small" aria-label={user.name}>
+              {initials}
             </span>
           </div>
         </header>
@@ -292,30 +327,27 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <span>
             RunOps <span aria-hidden="true">/</span> ระบบจัดการงานวิ่ง
           </span>
-          <span>เวอร์ชันสาธิต · ยังไม่เชื่อมต่อ API</span>
         </footer>
       </div>
+      {passwordOpen && (
+        <ChangePasswordModal onClose={() => setPasswordOpen(false)} />
+      )}
       {helpOpen && (
         <Modal
-          title="ยินดีต้อนรับสู่ RunOps"
+          title="คำแนะนำการใช้งาน RunOps"
           onClose={() => setHelpOpen(false)}
         >
           <div className="modal-body prose">
-            <p>
-              พื้นที่นี้เป็นต้นแบบหน้าจอสำหรับผู้ดูแลระบบ
-              สามารถทดลองสร้างงานวิ่ง ค้นหาออเดอร์ ตรวจสลิป และส่งออกรายงาน CSV
-              ได้
-            </p>
-            <p>
-              ข้อมูลทั้งหมดเป็นข้อมูลสมมติและบันทึกเฉพาะในเบราว์เซอร์
-              ไม่มีการรับเงิน ส่งพัสดุ หรือสร้างบัญชีผู้ใช้จริง
-            </p>
             <p>
               เลือกงานวิ่งที่ sidebar เพื่อดูภาพรวม ออเดอร์ สลิป ผู้สมัคร
               การจัดส่ง และรายงานของงานนั้น
               เมนูส่วนกลางใช้จัดการงานวิ่งทั้งหมดและผู้ใช้
               โดยไม่ขึ้นกับงานที่เลือก
-              การตรวจสอบสิทธิ์และระบบล็อกอินจะเชื่อมต่อกับ backend ในขั้นถัดไป
+            </p>
+            <p>
+              สิทธิ์การใช้งานขึ้นกับบทบาทของบัญชี
+              ผู้ดูข้อมูลไม่สามารถแก้ไขข้อมูลได้
+              และเมนูผู้ใช้และสิทธิ์เปิดให้เฉพาะผู้ดูแลระบบ
             </p>
           </div>
           <div className="modal-actions">

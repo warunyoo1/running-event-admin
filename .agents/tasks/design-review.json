@@ -1,0 +1,13 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    { "id": 1, "severity": "MEDIUM", "title": "Pre-flight GET /health can contact the deployed host when misconfigured; replace with zero-contact env assertion plus routes-manifest grep (design section 5 step 3)" },
+    { "id": 2, "severity": "MEDIUM", "title": "PUT /events/:id is not a full replacement ($set of provided fields); empty strings for registrationEnds/category/theme/race start fail validation; specify serialization and non-clearable fields (section 1.4)" },
+    { "id": 3, "severity": "MEDIUM", "title": "Open-redirect guard allows '/\\evil.com'; require no backslash and same-origin URL check (section 4)" },
+    { "id": 4, "severity": "NIT", "title": "Next version described as locked but package.json uses ^16.0.0 (installed 16.4.1)" },
+    { "id": 5, "severity": "NIT", "title": "Dashboard 'participants' is sum of reserved seats, not participant count" },
+    { "id": 6, "severity": "NIT", "title": "Specify clearing BIB sends bibNo:null, never empty string" },
+    { "id": 7, "severity": "NIT", "title": "Add positive Origin check (allowed origin returns 200 through rewrite) to verification plan" }
+  ],
+  "reviewDoc": "c:/Project/running-event-admin/.agents/tasks/design-review.md"
+}

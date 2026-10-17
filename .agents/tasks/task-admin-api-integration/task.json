@@ -1,0 +1,12 @@
+﻿{
+    "task_id":  "task-admin-api-integration",
+    "task_description":  "Wire admin Next app to the real running-event-api, remove localStorage mock layer, with local runtime verification",
+    "status":  "pending",
+    "feature_order":  [
+                          "FEAT-001",
+                          "FEAT-002",
+                          "FEAT-003",
+                          "FEAT-004"
+                      ],
+    "blocked_reason":  null
+}

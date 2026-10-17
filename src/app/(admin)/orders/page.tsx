@@ -2,22 +2,28 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  Download,
-  ChevronLeft,
-  ChevronRight,
-  ArrowUpRight,
-} from "lucide-react";
-import { useDemo } from "@/features/admin/demo-store";
-import {
-  date,
-  exportCsv,
-  money,
-  statusLabels,
-  type OrderStatus,
-} from "@/features/admin/data";
+import { Download, ArrowUpRight } from "lucide-react";
+import { useScope } from "@/features/admin/scope-provider";
+import { useAsync } from "@/features/admin/use-async";
+import { useDebounced } from "@/features/admin/use-debounced";
+import { useToast } from "@/features/admin/toast-provider";
+import { date, money, statusLabels } from "@/features/admin/format";
 import { OrderDetail } from "@/features/admin/order-detail";
+import { exportsApi, ordersApi } from "@/lib/api";
+import { errorMessage } from "@/lib/api/errors";
+import { EXPORT_LIMIT, PAGE_SIZE } from "@/lib/constants";
+import type { OrderStatus } from "@/lib/api/types";
+import { ErrorState, LoadingState, Pager } from "@/components/data-states";
 import { Badge, EmptyState, PageHeading, SearchField } from "@/components/ui";
+
+const ORDER_STATUSES: OrderStatus[] = [
+  "pending",
+  "slip_uploaded",
+  "paid",
+  "rejected",
+  "expired",
+  "cancelled",
+];
 
 export default function OrdersPage() {
   return (
@@ -27,43 +33,41 @@ export default function OrdersPage() {
   );
 }
 function Orders() {
-  const { events, orders, eventId } = useDemo();
+  const { scopeEventId } = useScope();
+  const notify = useToast();
   const params = useSearchParams();
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState<OrderStatus | "">("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(params.get("order"));
-  const filtered = orders.filter(
-    (o) =>
-      (eventId === "all" || o.eventId === eventId) &&
-      (status === "all" || o.status === status) &&
-      `${o.id} ${o.contact} ${o.phone}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
+  const [exporting, setExporting] = useState(false);
+  const q = useDebounced(query.trim());
+  const filters = { eventId: scopeEventId, status, q, from, to };
+  const { data, error, loading, reload } = useAsync(
+    (signal) =>
+      ordersApi.listOrders({ ...filters, page, pageSize: PAGE_SIZE }, signal),
+    [scopeEventId, status, q, from, to, page],
   );
-  const pages = Math.max(1, Math.ceil(filtered.length / 8));
-  const currentPage = Math.min(page, pages);
-  function download() {
-    exportCsv("orders-demo.csv", [
-      [
-        "หมายเลขออเดอร์",
-        "ผู้ติดต่อ",
-        "งานวิ่ง",
-        "จำนวนผู้สมัคร",
-        "ยอดชำระ",
-        "สถานะ",
-        "วันที่สมัคร",
-      ],
-      ...filtered.map((o) => [
-        o.id,
-        o.contact,
-        events.find((e) => e.id === o.eventId)?.name ?? "",
-        o.participants.length,
-        o.amount,
-        statusLabels[o.status],
-        date(o.createdAt),
-      ]),
-    ]);
+  const rows = data?.data ?? [];
+
+  async function download() {
+    setExporting(true);
+    try {
+      const { rows: count } = await exportsApi.exportOrdersCsv(filters);
+      if (count >= EXPORT_LIMIT) {
+        notify(`ส่งออกได้สูงสุด ${EXPORT_LIMIT.toLocaleString("th-TH")} รายการ ข้อมูลอาจไม่ครบ`);
+      }
+    } catch (failure) {
+      notify(errorMessage(failure));
+    } finally {
+      setExporting(false);
+    }
+  }
+  function changeFilter(apply: () => void) {
+    apply();
+    setPage(1);
   }
   return (
     <>
@@ -74,7 +78,7 @@ function Orders() {
           <button
             className="button"
             onClick={download}
-            disabled={!filtered.length}
+            disabled={!rows.length || exporting}
           >
             <Download size={16} aria-hidden="true" />
             ส่งออก CSV
@@ -85,82 +89,90 @@ function Orders() {
         <div className="filter-bar in-panel">
           <SearchField
             value={query}
-            onChange={(value) => {
-              setQuery(value);
-              setPage(1);
-            }}
+            onChange={(value) => changeFilter(() => setQuery(value))}
             placeholder="ค้นหาเลขออเดอร์ ชื่อ หรือเบอร์โทร"
           />
           <label>
             <span className="sr-only">สถานะออเดอร์</span>
             <select
               value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) =>
+                changeFilter(() => setStatus(e.target.value as OrderStatus | ""))
+              }
             >
-              <option value="all">ทุกสถานะ</option>
-              {(
-                [
-                  "pending",
-                  "slip_uploaded",
-                  "paid",
-                  "rejected",
-                  "expired",
-                  "cancelled",
-                ] as OrderStatus[]
-              ).map((s) => (
+              <option value="">ทุกสถานะ</option>
+              {ORDER_STATUSES.map((s) => (
                 <option value={s} key={s}>
                   {statusLabels[s]}
                 </option>
               ))}
             </select>
           </label>
-          <span className="result-count">{filtered.length} ออเดอร์</span>
+          <label>
+            <span className="sr-only">สมัครตั้งแต่วันที่</span>
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => changeFilter(() => setFrom(e.target.value))}
+            />
+          </label>
+          <label>
+            <span className="sr-only">สมัครถึงวันที่</span>
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => changeFilter(() => setTo(e.target.value))}
+            />
+          </label>
+          <span className="result-count">
+            {data ? `${data.meta.total} ออเดอร์` : ""}
+          </span>
         </div>
-        {filtered.length ? (
-          <>
-            <div className="table-scroll">
-              <table className="table-mobile-cards" role="table">
-                <thead>
-                  <tr>
-                    <th>หมายเลขออเดอร์</th>
-                    <th className="table-secondary">ผู้ติดต่อ</th>
-                    <th className="table-secondary">งานวิ่ง</th>
-                    <th className="numeric">ยอดชำระ</th>
-                    <th>สถานะ</th>
-                    <th className="table-secondary">วันที่สมัคร</th>
-                    <th>
-                      <span className="sr-only">รายละเอียด</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered
-                    .slice((currentPage - 1) * 8, currentPage * 8)
-                    .map((o) => (
+        {error && <ErrorState message={error} onRetry={reload} />}
+        {!data && loading && <LoadingState />}
+        {data &&
+          (rows.length ? (
+            <>
+              <div className="table-scroll" aria-busy={loading}>
+                <table className="table-mobile-cards" role="table">
+                  <thead>
+                    <tr>
+                      <th>หมายเลขออเดอร์</th>
+                      <th className="table-secondary">ผู้ติดต่อ</th>
+                      <th className="table-secondary">งานวิ่ง</th>
+                      <th className="numeric">ยอดชำระ</th>
+                      <th>สถานะ</th>
+                      <th className="table-secondary">วันที่สมัคร</th>
+                      <th>
+                        <span className="sr-only">รายละเอียด</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((o) => (
                       <tr key={o.id}>
                         <td className="mobile-record">
                           <button
                             className="order-link"
                             onClick={() => setSelected(o.id)}
                           >
-                            {o.id}
+                            {o.orderNo}
                           </button>
                           <span className="mobile-only mobile-contact">
-                            {o.contact}
+                            {o.contactName}
                           </span>
                           <small className="cell-sub">
-                            {o.participants.length} ผู้สมัคร
+                            {o.participantCount} ผู้สมัคร
                           </small>
                         </td>
                         <td className="table-secondary">
-                          <span className="person-name">{o.contact}</span>
-                          <small className="cell-sub">{o.phone}</small>
+                          <span className="person-name">{o.contactName}</span>
+                          <small className="cell-sub">{o.contactPhone}</small>
                         </td>
                         <td className="table-secondary table-event">
-                          {events.find((e) => e.id === o.eventId)?.name}
+                          {o.eventName}
                         </td>
                         <td
                           className="numeric strong mobile-amount"
@@ -178,14 +190,14 @@ function Orders() {
                           <button
                             className="icon-button"
                             onClick={() => setSelected(o.id)}
-                            aria-label={`ดูออเดอร์ ${o.id}`}
+                            aria-label={`ดูออเดอร์ ${o.orderNo}`}
                           >
                             <ArrowUpRight size={17} />
                           </button>
                           <button
                             className="button small-button mobile-only"
                             onClick={() => setSelected(o.id)}
-                            aria-label={`ดูรายละเอียดออเดอร์ ${o.id}`}
+                            aria-label={`ดูรายละเอียดออเดอร์ ${o.orderNo}`}
                           >
                             ดูรายละเอียด
                             <ArrowUpRight size={15} aria-hidden="true" />
@@ -193,44 +205,21 @@ function Orders() {
                         </td>
                       </tr>
                     ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="pagination">
-              <span>
-                แสดง {(currentPage - 1) * 8 + 1}–
-                {Math.min(currentPage * 8, filtered.length)} จาก{" "}
-                {filtered.length} ออเดอร์
-              </span>
-              <div>
-                <button
-                  className="icon-button"
-                  disabled={currentPage === 1}
-                  onClick={() => setPage(currentPage - 1)}
-                  aria-label="หน้าก่อนหน้า"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <span>
-                  หน้า {currentPage} / {pages}
-                </span>
-                <button
-                  className="icon-button"
-                  disabled={currentPage === pages}
-                  onClick={() => setPage(currentPage + 1)}
-                  aria-label="หน้าถัดไป"
-                >
-                  <ChevronRight size={18} />
-                </button>
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </>
-        ) : (
-          <EmptyState title="ไม่พบออเดอร์" />
-        )}
+              <Pager meta={data.meta} unit="ออเดอร์" onPage={setPage} />
+            </>
+          ) : (
+            <EmptyState title="ไม่พบออเดอร์" />
+          ))}
       </div>
       {selected && (
-        <OrderDetail orderId={selected} onClose={() => setSelected(null)} />
+        <OrderDetail
+          orderId={selected}
+          onChanged={reload}
+          onClose={() => setSelected(null)}
+        />
       )}
     </>
   );

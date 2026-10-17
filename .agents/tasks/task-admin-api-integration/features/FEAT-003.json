@@ -1,0 +1,22 @@
+﻿{
+    "id":  "FEAT-003",
+    "type":  "feat",
+    "description":  "Wire events (create/edit with toEventBody, A2) and users pages; delete the mock layer (demo-store, demo data, old lib/api.ts). Plan Steps 4-5.",
+    "status":  "completed",
+    "steps":  [
+                  "Follow c:\\Project\\running-event-admin\\.agents\\tasks\\admin-api-integration-plan.md Steps 4 and 5",
+                  "Disable clearing of registrationEnds/category/theme/race start once set"
+              ],
+    "acceptance_criteria":  [
+                                "No references to useDemo, demo-store, runops-demo, initialState remain",
+                                "localStorage only stores selected event id",
+                                "npm run typecheck and npm run build pass"
+                            ],
+    "verification":  [
+                         "npm run typecheck",
+                         "npm run build",
+                         "Select-String -Path src -Recurse -Pattern useDemo,demo-store,runops-demo returns nothing"
+                     ],
+    "blocked_reason":  null,
+    "findings":  "Done: typecheck + build (API_PROXY_TARGET=http://localhost:4010) pass; no useDemo/demo-store/runops-demo/initialState/exportCsv left in src; localStorage only in scope-provider (selected event id). Deleted demo-store.tsx and data.ts (old lib/api.ts was already gone); (admin)/layout no longer wraps DemoProvider; ui.tsx now imports statusLabels from format.ts. Events page: server list (q, status incl. upcoming, pagination), create/edit modal with subtitle/description/province/category/theme/registrationEnds/organizer/refundPolicy/race start, race ids from API (existing ids sent on update), toEventBody (A2); category/theme/registrationEnds/race start cannot be cleared once set (empty option disabled, date/time required); API fields (races.0.quota) mapped to inputs; SLUG_TAKEN/EVENT_HAS_ORDERS shown as form message; reloads list and scope events after save; create/edit hidden for non-super; ?event=<id> deep link opens editor from scope events. Race rows are not disabled when orderCount>0 (hint shown; API enforces EVENT_HAS_ORDERS). Only new (id-less) race rows can be removed. Cards show seats reserved = quota - remaining. Users page: ForbiddenState (EmptyState) for non-super; list /users with client-side search (API has no q); create (password 10..200), edit (email read-only, role, active, optional new password); 409 EMAIL_TAKEN/LAST_SUPER_ADMIN surfaced via API message. Added format.ts categoryLabels/themeLabels/artTheme (dashboard now imports artTheme), CSS race-field-row now 4 columns. Not runtime-tested against API (Step 7). Nothing added to git."
+}

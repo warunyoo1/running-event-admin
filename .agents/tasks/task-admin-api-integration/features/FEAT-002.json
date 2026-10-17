@@ -1,0 +1,21 @@
+﻿{
+    "id":  "FEAT-002",
+    "type":  "feat",
+    "description":  "Wire dashboard, orders (+detail), slips, participants, shipping, reports and their CSV exports to the real API. Plan Step 3.",
+    "status":  "completed",
+    "steps":  [
+                  "Follow c:\\Project\\running-event-admin\\.agents\\tasks\\admin-api-integration-plan.md Step 3 page by page; use only src/lib/api endpoint modules",
+                  "Hide write actions for viewer; BIB clear sends null (A6); dashboard label ที่นั่งที่จอง (A5)"
+              ],
+    "acceptance_criteria":  [
+                                "No useDemo in these pages",
+                                "Each page has loading, error and empty states and server pagination where API paginates",
+                                "npm run typecheck and npm run build pass"
+                            ],
+    "verification":  [
+                         "npm run typecheck",
+                         "npm run build"
+                     ],
+    "blocked_reason":  null,
+    "findings":  "Done: typecheck + build (API_PROXY_TARGET=http://localhost:4010) pass; no useDemo/demo-store/exportCsv in dashboard, orders, slips, participants, shipping, reports, order-detail. New shared: components/data-states.tsx (LoadingState, ErrorState with retry, Pager), features/admin/{use-debounced.ts,client-csv.ts (clientCsv; data.ts exportCsv left for Step 5 deletion)}, format.ts formatAddress, small CSS (.data-error, .slip-preview img, .bib-edit). Pattern: useAsync + loading only when no data (aria-busy on stale), server pagination PAGE_SIZE, debounced q, scopeEventId deps, write actions gated by canWrite(user.role) (viewer: no cancel/approve/reject, BIB edit, collected toggle, tracking button). OrderDetail props: orderId,onClose,onChanged,review,paymentId; approve has transactionRef input (3..64 regex), reject/cancel with reason. Dashboard: label ที่นั่งที่จอง (A5); the demo line chart (no API data) was replaced by a seats-per-race table from dashboard.races, hard-coded date label removed, pending amount sum dropped (no API aggregate). Slips: stat cards now pendingReview/paid/paidRevenue from /dashboard; waiting-tab count = pendingReview, history count = meta.total. Participants: status select replaces only-paid; race select from scope events; BIB clear sends null (A6) and BIB edit only for paid orders. Shipping: tracking modal provider+number; search page-local (labeled); tab counts only for active tab; CSV honors method. Reports: empty default dates, shirt-size status select, all 7 sizes, report CSV = orders.csv, shirt CSV client-side; summary table columns ผู้สมัคร/ชำระแล้ว/ยอดเงิน (no quota in API). CSV \u003e= EXPORT_LIMIT rows -\u003e warning toast. Remaining demo users: events/users pages and DemoProvider in (admin)/layout (FEAT-003/004). Not runtime-tested against API (Step 7)."
+}

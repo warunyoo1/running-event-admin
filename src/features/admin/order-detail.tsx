@@ -2,58 +2,152 @@
 
 import { useState } from "react";
 import { Check, ShieldCheck, X, ScanLine } from "lucide-react";
-import { useDemo } from "./demo-store";
-import { date, money, type Order } from "./data";
+import { useAuth } from "./auth-provider";
+import { canWrite } from "./permissions";
+import { useAsync } from "./use-async";
+import { useToast } from "./toast-provider";
+import { date, formatAddress, money } from "./format";
+import { ordersApi, slipsApi } from "@/lib/api";
+import { fieldErrorsFor, formMessage } from "@/lib/api/errors";
+import type { OrderDetail as OrderDetailData } from "@/lib/api/types";
+import { ErrorState, LoadingState } from "@/components/data-states";
 import { Badge, Modal } from "@/components/ui";
+
+const TRANSACTION_REF = /^[A-Za-z0-9\-_/.]{3,64}$/;
+const TRANSACTION_REF_HINT = "ใช้ตัวอักษรอังกฤษ ตัวเลข หรือ - _ / . ความยาว 3–64 ตัวอักษร";
+const REASON_MAX = 500;
+
+type Mode = "view" | "rejecting" | "cancelling";
+
+function SlipImage({ paymentId }: { paymentId: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (!paymentId || failed) {
+    return (
+      <>
+        <ScanLine size={34} aria-hidden="true" />
+        <p role="status">ไม่พบไฟล์สลิป</p>
+      </>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- cookie-authenticated, no-store image
+    <img
+      src={slipsApi.slipImageUrl(paymentId)}
+      alt="สลิปการโอนเงิน"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export function OrderDetail({
   orderId,
   onClose,
+  onChanged,
   review = false,
+  paymentId,
 }: {
   orderId: string;
   onClose: () => void;
+  /** Called after a successful cancel/approve/reject so lists can reload. */
+  onChanged?: () => void;
   review?: boolean;
+  paymentId?: string | null;
 }) {
-  const { orders, events, updateOrder, notify } = useDemo();
-  const order = orders.find((o) => o.id === orderId);
+  const { user } = useAuth();
+  const notify = useToast();
+  const { data: order, error: loadError, loading, reload } = useAsync(
+    (signal) => ordersApi.getOrder(orderId, signal),
+    [orderId],
+  );
+  const [mode, setMode] = useState<Mode>("view");
   const [reason, setReason] = useState("");
+  const [transactionRef, setTransactionRef] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
-  const [rejecting, setRejecting] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  if (!order) return null;
-  function approve(current: Order) {
-    if (current.status !== "slip_uploaded") return;
-    if (
-      orders.some(
-        (o) =>
-          o.id !== current.id &&
-          o.status === "paid" &&
-          o.reference === current.reference,
-      )
-    ) {
-      setError("พบเลขอ้างอิงธุรกรรมซ้ำกับออเดอร์ที่ชำระเงินแล้ว");
+  const [pending, setPending] = useState(false);
+  const writable = canWrite(user.role);
+
+  async function run(
+    action: () => Promise<OrderDetailData>,
+    success: string,
+  ) {
+    setPending(true);
+    setError("");
+    setFieldErrors({});
+    try {
+      await action();
+      notify(success);
+      onChanged?.();
+      onClose();
+    } catch (failure) {
+      setFieldErrors(fieldErrorsFor(failure));
+      setError(formMessage(failure));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function approve(current: OrderDetailData) {
+    const ref = transactionRef.trim();
+    if (!TRANSACTION_REF.test(ref)) {
+      setFieldErrors({ transactionRef: TRANSACTION_REF_HINT });
       return;
     }
-    updateOrder(current.id, {
-      status: "paid",
-      reviewedAt: new Date().toISOString(),
-      reviewedBy: "ผู้ดูแลระบบสาธิต",
-      rejectionReason: undefined,
-    });
-    notify(`อนุมัติสลิปสาธิต ${current.id} แล้ว`);
-    onClose();
+    void run(
+      () => ordersApi.approveOrder(current.id, ref),
+      `อนุมัติสลิป ${current.orderNo} แล้ว`,
+    );
   }
+
+  function reject(current: OrderDetailData) {
+    if (!reason.trim()) {
+      setFieldErrors({ reason: "กรุณาระบุเหตุผลที่สลิปไม่ผ่าน" });
+      return;
+    }
+    void run(
+      () => ordersApi.rejectOrder(current.id, reason.trim()),
+      `บันทึกผลตรวจสลิป ${current.orderNo} แล้ว`,
+    );
+  }
+
+  function cancel(current: OrderDetailData) {
+    void run(
+      () => ordersApi.cancelOrder(current.id, reason.trim()),
+      `ยกเลิกออเดอร์ ${current.orderNo} แล้ว`,
+    );
+  }
+
+  const title = review ? "ตรวจสอบสลิปชำระเงิน" : "รายละเอียดออเดอร์";
+  if (!order) {
+    return (
+      <Modal title={title} wide onClose={onClose}>
+        <div className="modal-body">
+          {loadError && <ErrorState message={loadError} onRetry={reload} />}
+          {loading && <LoadingState />}
+        </div>
+        <div className="modal-actions">
+          <button className="button" onClick={onClose}>
+            ปิดรายละเอียด
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  const canReview = review && writable && order.status === "slip_uploaded";
+  const canCancel =
+    writable && ["pending", "slip_uploaded", "rejected"].includes(order.status);
+  const slipPaymentId =
+    paymentId ??
+    order.payments.find((payment) => payment.status === "submitted")?.id ??
+    order.payments[0]?.id ??
+    null;
   return (
-    <Modal
-      title={review ? "ตรวจสอบสลิปชำระเงิน" : "รายละเอียดออเดอร์"}
-      wide
-      onClose={onClose}
-    >
+    <Modal title={title} wide onClose={onClose}>
       <div className="modal-body">
         <div className="detail-heading">
           <div>
-            <h3>{order.id}</h3>
+            <h3>{order.orderNo}</h3>
             <p>{date(order.createdAt, true)}</p>
           </div>
           <Badge status={order.status} />
@@ -61,33 +155,21 @@ export function OrderDetail({
         <div className={review ? "review-layout" : ""}>
           {review && (
             <div className="slip-preview">
-              <ScanLine size={34} aria-hidden="true" />
-              <span className="demo-pill">ตัวอย่างสลิปสาธิต</span>
-              <strong>โอนเงินสำเร็จ</strong>
-              <span>รูปแบบจำลองสำหรับทดสอบหน้าจอ</span>
+              <SlipImage paymentId={slipPaymentId} />
               <b>{money(order.amount)}</b>
-              <div>
-                <small>ผู้โอน</small>
-                <p>{order.contact}</p>
-                <small>ผู้รับ</small>
-                <p>บัญชีตัวอย่างงานวิ่ง</p>
-                <small>เลขอ้างอิง</small>
-                <p className="reference">{order.reference}</p>
-              </div>
-              <p className="slip-watermark">ไม่ใช่หลักฐานการชำระเงินจริง</p>
             </div>
           )}
           <div>
             <dl className="detail-list">
               <div>
                 <dt>งานวิ่ง</dt>
-                <dd>{events.find((e) => e.id === order.eventId)?.name}</dd>
+                <dd>{order.eventName}</dd>
               </div>
               <div>
                 <dt>ผู้ติดต่อ</dt>
                 <dd>
-                  {order.contact}
-                  <small>{order.phone}</small>
+                  {order.contactName}
+                  <small>{order.contactPhone}</small>
                 </dd>
               </div>
               <div>
@@ -105,7 +187,22 @@ export function OrderDetail({
               {order.address && (
                 <div>
                   <dt>ที่อยู่จัดส่ง</dt>
-                  <dd>{order.address}</dd>
+                  <dd>{formatAddress(order.address)}</dd>
+                </div>
+              )}
+              {order.trackingNo && (
+                <div>
+                  <dt>เลขพัสดุ</dt>
+                  <dd>
+                    {order.trackingNo}
+                    <small>{order.trackingProvider}</small>
+                  </dd>
+                </div>
+              )}
+              {order.transactionRef && (
+                <div>
+                  <dt>เลขอ้างอิงธุรกรรม</dt>
+                  <dd>{order.transactionRef}</dd>
                 </div>
               )}
               {order.reviewedAt && (
@@ -123,16 +220,22 @@ export function OrderDetail({
                   <dd className="danger-text">{order.rejectionReason}</dd>
                 </div>
               )}
+              {order.cancelReason && (
+                <div>
+                  <dt>เหตุผลที่ยกเลิก</dt>
+                  <dd>{order.cancelReason}</dd>
+                </div>
+              )}
             </dl>
             <div className="detail-participants">
               <h3>ผู้สมัคร {order.participants.length} คน</h3>
               {order.participants.map((p) => (
                 <div key={p.id}>
-                  <span className="avatar small">{p.name.slice(0, 1)}</span>
+                  <span className="avatar small">{p.firstName.slice(0, 1)}</span>
                   <span>
-                    {p.name}
+                    {p.firstName} {p.lastName}
                     <small>
-                      {p.race} · เสื้อ {p.size}
+                      {p.raceName} · เสื้อ {p.size}
                     </small>
                   </span>
                 </div>
@@ -140,91 +243,140 @@ export function OrderDetail({
             </div>
           </div>
         </div>
+        {canReview && mode === "view" && (
+          <label className="rejection-field">
+            เลขอ้างอิงธุรกรรมจากสลิป
+            <input
+              value={transactionRef}
+              maxLength={64}
+              aria-invalid={Boolean(fieldErrors.transactionRef)}
+              onChange={(e) => setTransactionRef(e.target.value)}
+              placeholder="เช่น 202610150001"
+            />
+            {fieldErrors.transactionRef && (
+              <small className="danger-text">{fieldErrors.transactionRef}</small>
+            )}
+          </label>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
-        {rejecting && (
+        {mode === "rejecting" && (
           <label className="rejection-field">
             เหตุผลที่สลิปไม่ผ่าน
             <textarea
               autoFocus
               required
+              maxLength={REASON_MAX}
+              aria-invalid={Boolean(fieldErrors.reason)}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="เช่น ยอดเงินไม่ตรง หรือภาพไม่ชัดเจน"
             />
+            {fieldErrors.reason && (
+              <small className="danger-text">{fieldErrors.reason}</small>
+            )}
           </label>
         )}
-        {cancelling && (
-          <div className="form-error" role="alert">
-            ยืนยันการยกเลิกออเดอร์สาธิตนี้หรือไม่?
-            ผู้สมัครในออเดอร์จะถูกนำออกจากยอดสมัครที่ยังมีสิทธิ์
-          </div>
+        {mode === "cancelling" && (
+          <label className="rejection-field">
+            เหตุผลที่ยกเลิก (ไม่บังคับ)
+            <textarea
+              autoFocus
+              maxLength={REASON_MAX}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="ยืนยันการยกเลิกออเดอร์นี้ ที่นั่งจะถูกคืนโควตา"
+            />
+            {fieldErrors.reason && (
+              <small className="danger-text">{fieldErrors.reason}</small>
+            )}
+          </label>
         )}
       </div>
       <div className="modal-actions">
-        {review && order.status === "slip_uploaded" ? (
-          rejecting ? (
-            <>
-              <button className="button" onClick={() => setRejecting(false)}>
-                กลับ
-              </button>
-              <button
-                className="button danger"
-                onClick={() => {
-                  if (!reason.trim()) {
-                    setError("กรุณาระบุเหตุผลที่สลิปไม่ผ่าน");
-                    return;
-                  }
-                  updateOrder(order.id, {
-                    status: "rejected",
-                    rejectionReason: reason.trim(),
-                    reviewedAt: new Date().toISOString(),
-                    reviewedBy: "ผู้ดูแลระบบสาธิต",
-                  });
-                  notify("บันทึกผลตรวจสลิปสาธิตแล้ว");
-                  onClose();
-                }}
-              >
-                ยืนยันสลิปไม่ผ่าน
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="button" onClick={() => setRejecting(true)}>
-                <X size={16} aria-hidden="true" />
-                สลิปไม่ผ่าน
-              </button>
-              <button className="button primary" onClick={() => approve(order)}>
-                <ShieldCheck size={17} aria-hidden="true" />
-                อนุมัติการชำระเงิน
-              </button>
-            </>
-          )
+        {mode === "rejecting" ? (
+          <>
+            <button
+              className="button"
+              disabled={pending}
+              onClick={() => setMode("view")}
+            >
+              กลับ
+            </button>
+            <button
+              className="button danger"
+              disabled={pending}
+              onClick={() => reject(order)}
+            >
+              ยืนยันสลิปไม่ผ่าน
+            </button>
+          </>
+        ) : mode === "cancelling" ? (
+          <>
+            <button
+              className="button"
+              disabled={pending}
+              onClick={() => setMode("view")}
+            >
+              กลับ
+            </button>
+            <button
+              className="button danger-outline"
+              disabled={pending}
+              onClick={() => cancel(order)}
+            >
+              ยืนยันยกเลิกออเดอร์
+            </button>
+          </>
         ) : (
           <>
-            {!["paid", "cancelled", "expired"].includes(order.status) && (
+            {canReview && (
+              <>
+                <button
+                  className="button"
+                  disabled={pending}
+                  onClick={() => {
+                    setError("");
+                    setFieldErrors({});
+                    setReason("");
+                    setMode("rejecting");
+                  }}
+                >
+                  <X size={16} aria-hidden="true" />
+                  สลิปไม่ผ่าน
+                </button>
+                <button
+                  className="button primary"
+                  disabled={pending}
+                  onClick={() => approve(order)}
+                >
+                  <ShieldCheck size={17} aria-hidden="true" />
+                  อนุมัติการชำระเงิน
+                </button>
+              </>
+            )}
+            {!canReview && canCancel && (
               <button
                 className="button danger-outline"
                 onClick={() => {
-                  if (!cancelling) {
-                    setCancelling(true);
-                    return;
-                  }
-                  updateOrder(order.id, { status: "cancelled" });
-                  notify("ยกเลิกออเดอร์สาธิตแล้ว");
-                  onClose();
+                  setError("");
+                  setFieldErrors({});
+                  setReason("");
+                  setMode("cancelling");
                 }}
               >
-                {cancelling ? "ยืนยันยกเลิกออเดอร์" : "ยกเลิกออเดอร์"}
+                ยกเลิกออเดอร์
               </button>
             )}
-            <button className="button" onClick={onClose}>
-              <Check size={16} aria-hidden="true" />
-              ปิดรายละเอียด
-            </button>
+            {!canReview && (
+              <button className="button" onClick={onClose}>
+                <Check size={16} aria-hidden="true" />
+                ปิดรายละเอียด
+              </button>
+            )}
           </>
         )}
       </div>

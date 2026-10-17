@@ -1,0 +1,24 @@
+{
+    "id":  "FEAT-004",
+    "type":  "docs",
+    "description":  "Docs (README.md, docs/SYSTEM.md) and full local runtime verification with zero-contact guard, then cleanup. Plan Steps 6-7.",
+    "status":  "completed",
+    "steps":  [
+                  "Follow c:\\Project\\running-event-admin\\.agents\\tasks\\admin-api-integration-plan.md Step 6 then Step 7 exactly (A1, A2 persist case, A4, A7)",
+                  "Record verified/unverified items and any defects in findings; fix defects found in code",
+                  "Stop all servers; remove docker container, temp dirs and scripts"
+              ],
+    "acceptance_criteria":  [
+                                "README documents API_PROXY_TARGET, server env, gaps",
+                                "Runtime checks listed in Step 7 pass or are reported unverified with reason",
+                                "No deployed IP in committed files except .env.example; .next has none",
+                                "npm run typecheck and npm run build pass"
+                            ],
+    "verification":  [
+                         "npm run typecheck",
+                         "npm run build with guard",
+                         "git status --short shows only intended admin changes"
+                     ],
+    "blocked_reason":  null,
+    "findings":  "Docs: README.md (new) + docs/SYSTEM.md updated (API_PROXY_TARGET, server env CORS_ORIGINS/COOKIE_SECURE/TRUST_PROXY/LOGIN_RATE_MAX/seed, HTTP warning, roles, layout, how to add endpoint/page, gaps both directions, A4 wording). Deployed IP appears only in .env.example among committed/untracked files (scan excl. node_modules,.next,.git,.agents,.env.local).\nRuntime (zero-contact guard, API :4010 started first, Mongo 8.0 replset in throwaway container rr-fv-mongo on 27029; admin served with API_PROXY_TARGET=http://localhost:4010 on :3100): ~90 HTTP checks via :3100 all pass: login Origin localhost:3100 200 / evil.test 403 / wrong pw 401 INVALID_CREDENTIALS / 422 fields; me with/without cookie, logout; dashboard (+eventId), events list q/status/pagination, orders filters/pagination/q/from-to/empty params, detail, slips both tabs, slip image 200 image/*, participants, shipping both methods, reports + 7 shirt sizes; event create, PUT omitting optionals keeps registrationEnds/category/theme/race start (A2) and \u0027\u0027 clears subtitle, 422 races.0.quota, SLUG_TAKEN, EVENT_HAS_ORDERS; approve valid/duplicate ref 409/422, reject, INVALID_STATE, cancel+cancel again 409; BIB set, DUPLICATE_BIB, bibNo:null clears (A6), \u0027\u0027 -\u003e 422, collected, BIB on unpaid 409; tracking paid shipping ok / pickup 409; 3 CSVs (BOM+header+text/csv); users create/422/EMAIL_TAKEN/update/email rejected/LAST_SUPER_ADMIN; reviewer+viewer 403s; /login 200, /orders no cookie 307 /login?next=%2Forders. Headless Chrome (CDP, non-localhost hosts blocked) UI smoke on production build: unauth redirect, login form -\u003e next, all 8 pages load with no console errors or HTTP\u003e=400, order-detail/slip-review (image loads)/event/user modals open, logout clears cookie -\u003e /login.\nDefect found+fixed: src/features/admin/format.ts statusLabels/roleLabels contained double-encoded (mojibake) Thai; restored from git HEAD labels (+upcoming \u0027เร็วๆ นี้\u0027). Re-scan of src/docs for mojibake clean. Rebuilt and re-smoked OK.\nFinal: npm run typecheck and npm run build pass with guard; routes-manifest has http://localhost:4010/api/:path*; no deployed IP in .next/ build output.\nUnverified / notes: (1) a foreign \u0027next dev\u0027 (PID 26440, :3000, not started by this task, uses .env.local) holds the .next dev lock; its .next/dev/routes-manifest.json contains the deployed target. I did not touch or contact it, so verification ran on \u0027next start\u0027 (production build) instead of \u0027next dev\u0027; .next/dev IP will persist until that server is stopped/rebuilt. (2) Not tested: HTTPS/Secure cookie, TRUST_PROXY/X-Forwarded-For behaviour, real deployed server reachability, the safeNext/proxy behaviour in other browsers, event race-edit with existing orders via UI, change-password success path (only 422 checked), LOGIN rate limit 429. (3) Pre-existing containers rr-baseline-mongo and rr-verify-mongo (earlier steps, auth-enabled) were left untouched. (4) running-event-api has an unrelated modified postman/server.postman_environment.json; not touched by this step.\nCleanup: dev/start server and API stopped, rr-fv-mongo removed, temp dir (uploads, creds, scripts, chrome profiles, screenshots) deleted; no git add/commit."
+}

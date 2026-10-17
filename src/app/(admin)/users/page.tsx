@@ -2,52 +2,123 @@
 
 import { useState, type FormEvent } from "react";
 import { Pencil, Plus, Save, ShieldCheck } from "lucide-react";
-import { useDemo } from "@/features/admin/demo-store";
-import { roleLabels, type AdminUser, type Role } from "@/features/admin/data";
+import { useAuth } from "@/features/admin/auth-provider";
+import { useAsync } from "@/features/admin/use-async";
+import { useToast } from "@/features/admin/toast-provider";
+import { isSuper } from "@/features/admin/permissions";
+import { roleLabels } from "@/features/admin/format";
+import { usersApi } from "@/lib/api";
+import { fieldErrorsFor, formMessage } from "@/lib/api/errors";
+import type { Role, User, UserPatchBody } from "@/lib/api/types";
+import { ErrorState, LoadingState } from "@/components/data-states";
 import { EmptyState, Modal, PageHeading, SearchField } from "@/components/ui";
 
+const NAME_MAX = 100;
+const EMAIL_MAX = 200;
+const MIN_PASSWORD = 10;
+const MAX_PASSWORD = 200;
+const ROLES = Object.keys(roleLabels) as Role[];
+
+type UserForm = {
+  id: string | null;
+  name: string;
+  email: string;
+  role: Role;
+  active: boolean;
+  password: string;
+};
+
+const blankForm: UserForm = {
+  id: null,
+  name: "",
+  email: "",
+  role: "viewer",
+  active: true,
+  password: "",
+};
+
+const formFrom = (user: User): UserForm => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  active: user.active,
+  password: "",
+});
+
+function FieldError({ message }: { message?: string }) {
+  return message ? <span className="form-error">{message}</span> : null;
+}
+
 export default function UsersPage() {
-  const { users, saveUser, notify } = useDemo();
+  const { user } = useAuth();
+  if (!isSuper(user.role)) {
+    return (
+      <EmptyState
+        title="ไม่มีสิทธิ์เข้าถึง"
+        description="เฉพาะผู้ดูแลระบบเท่านั้นที่จัดการผู้ใช้ได้"
+      />
+    );
+  }
+  return <Users />;
+}
+
+function Users() {
+  const notify = useToast();
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [editing, setEditing] = useState<UserForm | null>(null);
   const [error, setError] = useState("");
-  const filtered = users.filter((u) =>
-    `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()),
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState(false);
+  const { data, error: loadError, loading, reload } = useAsync(
+    (signal) => usersApi.listUsers(signal),
+    [],
   );
-  function save(e: FormEvent<HTMLFormElement>) {
+  const needle = query.trim().toLowerCase();
+  const filtered = (data ?? []).filter((u) =>
+    `${u.name} ${u.email}`.toLowerCase().includes(needle),
+  );
+
+  function open(next: UserForm) {
+    setError("");
+    setFields({});
+    setEditing(next);
+  }
+
+  async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editing) return;
-    if (!editing.name.trim()) {
-      setError("กรุณาระบุชื่อที่แสดง");
-      return;
+    setPending(true);
+    setError("");
+    setFields({});
+    try {
+      if (editing.id) {
+        const body: UserPatchBody = {
+          name: editing.name.trim(),
+          role: editing.role,
+          active: editing.active,
+        };
+        if (editing.password) body.password = editing.password;
+        await usersApi.updateUser(editing.id, body);
+      } else {
+        await usersApi.createUser({
+          name: editing.name.trim(),
+          email: editing.email.trim().toLowerCase(),
+          password: editing.password,
+          role: editing.role,
+        });
+      }
+      notify("บันทึกผู้ใช้แล้ว");
+      setEditing(null);
+      reload();
+    } catch (failure) {
+      setFields(fieldErrorsFor(failure));
+      setError(formMessage(failure));
+    } finally {
+      setPending(false);
     }
-    if (
-      users.some(
-        (u) =>
-          u.id !== editing.id &&
-          u.email.toLowerCase() === editing.email.trim().toLowerCase(),
-      )
-    ) {
-      setError("อีเมลนี้มีอยู่แล้ว กรุณาใช้อีเมลอื่น");
-      return;
-    }
-    if (
-      (!editing.active || editing.role !== "super_admin") &&
-      !users.some(
-        (u) => u.id !== editing.id && u.active && u.role === "super_admin",
-      )
-    ) {
-      setError("ต้องมีผู้ดูแลระบบที่เปิดใช้งานอย่างน้อย 1 คน");
-      return;
-    }
-    saveUser({
-      ...editing,
-      name: editing.name.trim(),
-      email: editing.email.trim().toLowerCase(),
-    });
-    notify("บันทึกผู้ใช้สาธิตแล้ว ไม่มีการส่งคำเชิญจริง");
-    setEditing(null);
   }
+
   return (
     <>
       <PageHeading
@@ -55,34 +126,12 @@ export default function UsersPage() {
         scope="global"
         description="กำหนดบทบาทของทีมที่เข้ามาจัดการงานวิ่ง"
         action={
-          <button
-            className="button primary"
-            onClick={() => {
-              setEditing({
-                id: crypto.randomUUID(),
-                name: "",
-                email: "",
-                role: "viewer",
-                active: true,
-              });
-              setError("");
-            }}
-          >
+          <button className="button primary" onClick={() => open(blankForm)}>
             <Plus size={17} aria-hidden="true" />
             เพิ่มผู้ใช้
           </button>
         }
       />
-      <div className="permission-notice">
-        <ShieldCheck size={20} aria-hidden="true" />
-        <p>
-          <strong>แสดงตัวอย่างในมุมมองผู้ดูแลระบบ</strong>
-          <span>
-            การกำหนดสิทธิ์จริงต้องตรวจสอบที่ backend
-            การเปลี่ยนบทบาทที่นี่เป็นการแก้ข้อมูลสาธิตเท่านั้น
-          </span>
-        </p>
-      </div>
       <section className="panel">
         <div className="filter-bar in-panel">
           <SearchField
@@ -90,65 +139,65 @@ export default function UsersPage() {
             onChange={setQuery}
             placeholder="ค้นหาชื่อหรืออีเมล"
           />
-          <span className="result-count">{filtered.length} ผู้ใช้</span>
+          <span className="result-count">{data ? `${filtered.length} ผู้ใช้` : ""}</span>
         </div>
-        {filtered.length ? (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>ผู้ใช้</th>
-                  <th>อีเมล</th>
-                  <th>บทบาท</th>
-                  <th>สถานะ</th>
-                  <th>จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((user) => (
-                  <tr key={user.id}>
-                    <td>
-                      <div className="person-cell">
-                        <span className="avatar">{user.name.slice(0, 1)}</span>
-                        <strong>{user.name}</strong>
-                      </div>
-                    </td>
-                    <td>{user.email}</td>
-                    <td>{roleLabels[user.role]}</td>
-                    <td>
-                      <span
-                        className={`badge ${user.active ? "badge-paid" : "badge-closed"}`}
-                      >
-                        <span aria-hidden="true" />
-                        {user.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="button small-button"
-                        onClick={() => {
-                          setEditing(user);
-                          setError("");
-                        }}
-                      >
-                        <Pencil size={14} aria-hidden="true" />
-                        แก้ไข
-                      </button>
-                    </td>
+        {loadError && <ErrorState message={loadError} onRetry={reload} />}
+        {!data && loading && <LoadingState />}
+        {data &&
+          (filtered.length ? (
+            <div className="table-scroll" aria-busy={loading}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>ผู้ใช้</th>
+                    <th>อีเมล</th>
+                    <th>บทบาท</th>
+                    <th>สถานะ</th>
+                    <th>จัดการ</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState title="ไม่พบผู้ใช้" />
-        )}
+                </thead>
+                <tbody>
+                  {filtered.map((u) => (
+                    <tr key={u.id}>
+                      <td>
+                        <div className="person-cell">
+                          <span className="avatar">{u.name.slice(0, 1)}</span>
+                          <strong>{u.name}</strong>
+                        </div>
+                      </td>
+                      <td>{u.email}</td>
+                      <td>{roleLabels[u.role]}</td>
+                      <td>
+                        <span
+                          className={`badge ${u.active ? "badge-paid" : "badge-closed"}`}
+                        >
+                          <span aria-hidden="true" />
+                          {u.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="button small-button"
+                          onClick={() => open(formFrom(u))}
+                        >
+                          <Pencil size={14} aria-hidden="true" />
+                          แก้ไข
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="ไม่พบผู้ใช้" />
+          ))}
       </section>
       <div className="role-guide">
-        {Object.entries(roleLabels).map(([role, label]) => (
+        {ROLES.map((role) => (
           <div key={role}>
             <ShieldCheck size={19} aria-hidden="true" />
-            <h2>{label}</h2>
+            <h2>{roleLabels[role]}</h2>
             <p>
               {role === "super_admin"
                 ? "จัดการทุกโมดูล รวมถึงผู้ใช้และสิทธิ์"
@@ -161,11 +210,7 @@ export default function UsersPage() {
       </div>
       {editing && (
         <Modal
-          title={
-            users.some((u) => u.id === editing.id)
-              ? "แก้ไขผู้ใช้"
-              : "เพิ่มผู้ใช้สาธิต"
-          }
+          title={editing.id ? "แก้ไขผู้ใช้" : "เพิ่มผู้ใช้"}
           onClose={() => setEditing(null)}
         >
           <form onSubmit={save}>
@@ -180,69 +225,81 @@ export default function UsersPage() {
                 <input
                   autoFocus
                   required
-                  maxLength={80}
+                  maxLength={NAME_MAX}
                   value={editing.name}
-                  onChange={(e) =>
-                    setEditing({ ...editing, name: e.target.value })
-                  }
+                  aria-invalid={Boolean(fields.name)}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                 />
+                <FieldError message={fields.name} />
               </label>
               <label className="full">
                 อีเมล
                 <input
                   required
                   type="email"
+                  maxLength={EMAIL_MAX}
+                  readOnly={Boolean(editing.id)}
                   value={editing.email}
-                  onChange={(e) =>
-                    setEditing({ ...editing, email: e.target.value })
-                  }
+                  aria-invalid={Boolean(fields.email)}
+                  onChange={(e) => setEditing({ ...editing, email: e.target.value })}
                 />
+                {editing.id && <small>ไม่สามารถแก้ไขอีเมลได้</small>}
+                <FieldError message={fields.email} />
+              </label>
+              <label className="full">
+                {editing.id
+                  ? `รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน, อย่างน้อย ${MIN_PASSWORD} ตัวอักษร)`
+                  : `รหัสผ่าน (อย่างน้อย ${MIN_PASSWORD} ตัวอักษร)`}
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  required={!editing.id}
+                  minLength={MIN_PASSWORD}
+                  maxLength={MAX_PASSWORD}
+                  value={editing.password}
+                  aria-invalid={Boolean(fields.password)}
+                  onChange={(e) => setEditing({ ...editing, password: e.target.value })}
+                />
+                <FieldError message={fields.password} />
               </label>
               <label>
                 บทบาท
                 <select
                   value={editing.role}
-                  onChange={(e) =>
-                    setEditing({ ...editing, role: e.target.value as Role })
-                  }
+                  aria-invalid={Boolean(fields.role)}
+                  onChange={(e) => setEditing({ ...editing, role: e.target.value as Role })}
                 >
-                  {Object.entries(roleLabels).map(([role, label]) => (
+                  {ROLES.map((role) => (
                     <option value={role} key={role}>
-                      {label}
+                      {roleLabels[role]}
                     </option>
                   ))}
                 </select>
+                <FieldError message={fields.role} />
               </label>
-              <label>
-                สถานะ
-                <select
-                  value={String(editing.active)}
-                  onChange={(e) =>
-                    setEditing({
-                      ...editing,
-                      active: e.target.value === "true",
-                    })
-                  }
-                >
-                  <option value="true">เปิดใช้งาน</option>
-                  <option value="false">ปิดใช้งาน</option>
-                </select>
-              </label>
-              <p className="form-notice full">
-                ไม่มีการสร้างบัญชีล็อกอินหรือส่งอีเมลจริง
-              </p>
+              {editing.id && (
+                <label>
+                  สถานะ
+                  <select
+                    value={String(editing.active)}
+                    onChange={(e) =>
+                      setEditing({ ...editing, active: e.target.value === "true" })
+                    }
+                  >
+                    <option value="true">เปิดใช้งาน</option>
+                    <option value="false">ปิดใช้งาน</option>
+                  </select>
+                  <FieldError message={fields.active} />
+                </label>
+              )}
             </div>
             <div className="modal-actions">
-              <button
-                className="button"
-                type="button"
-                onClick={() => setEditing(null)}
-              >
+              <button className="button" type="button" onClick={() => setEditing(null)}>
                 ยกเลิก
               </button>
-              <button className="button primary" type="submit">
+              <button className="button primary" type="submit" disabled={pending}>
                 <Save size={16} aria-hidden="true" />
-                บันทึกผู้ใช้
+                {pending ? "กำลังบันทึก…" : "บันทึกผู้ใช้"}
               </button>
             </div>
           </form>

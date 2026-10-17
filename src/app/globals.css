@@ -1581,9 +1581,13 @@ input[type="checkbox"] {
   font-size: 12px;
   margin-bottom: 10px;
 }
+.race-field-row > .button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
 .race-field-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 15px;
 }
@@ -2533,4 +2537,35 @@ input[type="checkbox"] {
   .sidebar .profile {
     padding-block: 14px;
   }
+}
+
+.profile-actions {
+  display: flex;
+  margin-left: auto;
+}
+.login-form form .button {
+  margin-top: 20px;
+}
+
+.data-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+}
+.slip-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.bib-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bib-edit input {
+  width: 110px;
 }

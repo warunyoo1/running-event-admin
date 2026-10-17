@@ -4,7 +4,7 @@ import "@fontsource/noto-sans-thai/500.css";
 import "@fontsource/noto-sans-thai/600.css";
 import "@fontsource/noto-sans-thai/700.css";
 import "./globals.css";
-import { DemoProvider } from "@/features/admin/demo-store";
+import { ToastProvider } from "@/features/admin/toast-provider";
 
 export const metadata: Metadata = {
   description: "ระบบจัดการงานวิ่ง ผู้สมัคร และการตรวจสอบการชำระเงิน",
@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body>
-        <DemoProvider>{children}</DemoProvider>
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

@@ -1,15 +1,15 @@
 # ระบบหลังบ้านรับสมัครงานวิ่ง (Running Event Admin)
 
-สถานะเอกสาร: เริ่มพัฒนา Frontend สาธิตแล้ว (15 ต.ค. 2569) ยังไม่เชื่อมต่อ Backend
-Repo นี้: Frontend (Next.js) ของระบบ Admin เท่านั้น
+สถานะเอกสาร: Frontend เชื่อมต่อ API จริง (`running-event-api`) แล้ว
+Repo นี้: Frontend (Next.js) ของระบบ Admin เท่านั้น วิธีรัน โครงโค้ด และรายการที่ API ยังไม่รองรับ อยู่ใน `README.md`
 
 ### สถานะ Frontend ปัจจุบัน
-- Next.js App Router + TypeScript (strict), CSS ส่วนกลาง, Lucide และ Noto Sans Thai ที่โหลดจากแพ็กเกจในโปรเจกต์
-- โค้ดอยู่ใน `src/app` แยก route ตามโมดูล, `src/components` สำหรับ UI ร่วม และ `src/features/admin` สำหรับชนิดข้อมูลและ state สาธิต
-- มีหน้าภาพรวม งานวิ่ง ออเดอร์ ตรวจสลิป ผู้สมัคร รับอุปกรณ์/จัดส่ง รายงาน และผู้ใช้
-- เลือกงานที่ sidebar เพื่อกรองภาพรวม ออเดอร์ สลิป ผู้สมัคร การจัดส่ง และรายงาน โดยจำงานที่เลือกไว้ในเบราว์เซอร์; เมนูส่วนกลาง “จัดการงานวิ่ง” และ “ผู้ใช้และสิทธิ์” ไม่ถูกกรองตามงาน
-- ใช้ข้อมูลสมมติ บันทึกการเปลี่ยนแปลงใน localStorage เท่านั้น ไม่มีระบบยืนยันตัวตน ตรวจสิทธิ์ หรือธุรกรรมจริง
-- เริ่มพัฒนา: `npm install` แล้ว `npm run dev`; ตรวจสอบ: `npm run typecheck` และ `npm run build`
+- Next.js App Router + TypeScript (strict), CSS ส่วนกลาง, Lucide และ Noto Sans Thai ที่โหลดจากแพ็กเกจในโปรเจกต์ (Next ที่ติดตั้งคือ 16.4.1; `proxy.ts` มีตั้งแต่ 16.0)
+- โค้ดอยู่ใน `src/app` แยก route ตามโมดูล, `src/components` สำหรับ UI ร่วม, `src/features/admin` สำหรับ provider และ helper, `src/lib/api` สำหรับ API client
+- มีหน้าภาพรวม งานวิ่ง ออเดอร์ ตรวจสลิป ผู้สมัคร รับอุปกรณ์/จัดส่ง รายงาน และผู้ใช้ ทุกหน้าดึงข้อมูลจาก API พร้อมสถานะ loading / error / empty
+- เลือกงานที่ sidebar เพื่อกรองภาพรวม ออเดอร์ สลิป ผู้สมัคร การจัดส่ง และรายงาน โดยจำเฉพาะ id งานที่เลือกไว้ใน localStorage; เมนูส่วนกลาง “จัดการงานวิ่ง” และ “ผู้ใช้และสิทธิ์” ไม่ถูกกรองตามงาน
+- ล็อกอินผ่าน cookie httpOnly `rr_admin_token` ที่ API ออกให้ เบราว์เซอร์เรียก `/api/v1/admin/...` ที่ origin เดียวกัน แล้ว Next rewrite ไปที่ `API_PROXY_TARGET`; `src/proxy.ts` ตรวจแค่ว่ามี cookie ส่วนการตรวจสิทธิ์จริงทำที่ `GET /auth/me` และที่ API
+- เริ่มพัฒนา: ตั้ง `.env.local` ตาม `.env.example` แล้ว `npm install` และ `npm run dev`; ตรวจสอบ: `npm run typecheck` และ `npm run build`
 - ใช้ skill `ui-ux-pro-max` ร่วมกับ `frontend-design`; ยังไม่เพิ่มชุด UI, ตาราง หรือฟอร์มที่ไม่จำเป็นกับโครงปัจจุบัน
 
 ## 1. ที่มาและขอบเขต
@@ -24,7 +24,7 @@ Repo นี้: Frontend (Next.js) ของระบบ Admin เท่าน�
 |---|---|
 | Frontend | Next.js |
 | การชำระเงิน | ใช้รูป QR ที่มีอยู่แล้ว (ไม่ผ่าน payment gateway) ผู้สมัครอัปโหลดสลิป แอดมินตรวจเอง |
-| Backend | ยังไม่กำหนด (ดูข้อ 9) |
+| Backend | `running-event-api` (Express + MongoDB, REST) |
 
 ### ค่าเริ่มต้นที่เสนอ (รอยืนยัน)
 - Next.js App Router + TypeScript

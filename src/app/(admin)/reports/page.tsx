@@ -8,39 +8,71 @@ import {
   Shirt,
   ClipboardList,
 } from "lucide-react";
-import { useDemo } from "@/features/admin/demo-store";
-import { exportCsv, money, statusLabels } from "@/features/admin/data";
+import { useScope } from "@/features/admin/scope-provider";
+import { useAsync } from "@/features/admin/use-async";
+import { useToast } from "@/features/admin/toast-provider";
+import { clientCsv } from "@/features/admin/client-csv";
+import { money, number, statusLabels } from "@/features/admin/format";
+import { exportsApi, reportsApi } from "@/lib/api";
+import { errorMessage } from "@/lib/api/errors";
+import { EXPORT_LIMIT, SHIRT_SIZES } from "@/lib/constants";
+import type { OrderStatus } from "@/lib/api/types";
+import { ErrorState, LoadingState } from "@/components/data-states";
 import { EmptyState, PageHeading, StatCard } from "@/components/ui";
 
+const ORDER_STATUSES: OrderStatus[] = [
+  "pending",
+  "slip_uploaded",
+  "paid",
+  "rejected",
+  "expired",
+  "cancelled",
+];
+
 export default function ReportsPage() {
-  const { orders, events, eventId } = useDemo();
-  const [start, setStart] = useState("2026-10-01");
-  const [end, setEnd] = useState("2026-10-31");
+  const { scopeEventId } = useScope();
+  const notify = useToast();
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [shirtStatus, setShirtStatus] = useState<OrderStatus>("paid");
+  const [exporting, setExporting] = useState(false);
   const invalidRange = Boolean(start && end && start > end);
-  const scoped = orders.filter(
-    (o) =>
-      !invalidRange &&
-      (eventId === "all" || o.eventId === eventId) &&
-      (!start || o.createdAt.slice(0, 10) >= start) &&
-      (!end || o.createdAt.slice(0, 10) <= end),
+  const summary = useAsync(
+    (signal) =>
+      invalidRange
+        ? Promise.resolve(null)
+        : reportsApi.getReportSummary(
+            { eventId: scopeEventId, from: start, to: end },
+            signal,
+          ),
+    [scopeEventId, start, end, invalidRange],
   );
-  const paid = scoped.filter((o) => o.status === "paid");
-  const participants = paid.flatMap((o) => o.participants);
-  const sizes = ["S", "M", "L", "XL"];
-  const raceRows = events
-    .filter((e) => eventId === "all" || e.id === eventId)
-    .flatMap((e) =>
-      e.races.map((r) => ({
-        event: e.name,
-        race: r.name,
-        count: paid
-          .filter((o) => o.eventId === e.id)
-          .flatMap((o) => o.participants)
-          .filter((p) => p.race === r.name).length,
-        quota: r.quota,
-      })),
-    );
-  const amount = paid.reduce((sum, o) => sum + o.amount, 0);
+  const shirts = useAsync(
+    (signal) =>
+      reportsApi.getShirtSizes({ eventId: scopeEventId, status: shirtStatus }, signal),
+    [scopeEventId, shirtStatus],
+  );
+  const rows = summary.data?.rows ?? [];
+  const paidParticipants = rows.reduce((sum, row) => sum + row.paidParticipants, 0);
+  const shirtTotal = shirts.data?.total ?? 0;
+
+  async function downloadReport() {
+    setExporting(true);
+    try {
+      const { rows: count } = await exportsApi.exportOrdersCsv({
+        eventId: scopeEventId,
+        from: start,
+        to: end,
+      });
+      if (count >= EXPORT_LIMIT) {
+        notify(`ส่งออกได้สูงสุด ${EXPORT_LIMIT.toLocaleString("th-TH")} รายการ ข้อมูลอาจไม่ครบ`);
+      }
+    } catch (failure) {
+      notify(errorMessage(failure));
+    } finally {
+      setExporting(false);
+    }
+  }
   return (
     <>
       <PageHeading
@@ -49,27 +81,8 @@ export default function ReportsPage() {
         action={
           <button
             className="button"
-            disabled={!scoped.length}
-            onClick={() =>
-              exportCsv("report-demo.csv", [
-                [
-                  "ออเดอร์",
-                  "งานวิ่ง",
-                  "วันที่สมัคร",
-                  "ผู้สมัคร",
-                  "ยอดชำระ",
-                  "สถานะ",
-                ],
-                ...scoped.map((o) => [
-                  o.id,
-                  events.find((e) => e.id === o.eventId)?.name ?? "",
-                  o.createdAt.slice(0, 10),
-                  o.participants.length,
-                  o.amount,
-                  statusLabels[o.status],
-                ]),
-              ])
-            }
+            disabled={invalidRange || exporting}
+            onClick={downloadReport}
           >
             <Download size={16} aria-hidden="true" />
             ส่งออกรายงาน
@@ -98,31 +111,35 @@ export default function ReportsPage() {
             onChange={(e) => setEnd(e.target.value)}
           />
         </label>
-        <p>ยอดเงินและจำนวนเสื้อคำนวณจากออเดอร์ที่ชำระแล้ว</p>
+        <p>ยอดเงินคำนวณจากออเดอร์ที่ชำระแล้ว จำนวนเสื้อไม่ขึ้นกับช่วงวันที่</p>
       </div>
       {invalidRange && (
         <p role="alert" className="form-error">
           วันที่เริ่มต้นต้องไม่อยู่หลังวันที่สิ้นสุด
         </p>
       )}
+      {summary.error && (
+        <ErrorState message={summary.error} onRetry={summary.reload} />
+      )}
+      {!summary.data && summary.loading && <LoadingState />}
       <div className="stats-grid three">
         <StatCard
           title="ยอดชำระเงินแล้ว"
-          value={money(amount)}
+          value={summary.data ? money(summary.data.totals.paidRevenue) : "–"}
           note="รวมค่าจัดส่ง ไม่ใช่กำไรสุทธิ"
           icon={CircleDollarSign}
           accent
         />
         <StatCard
           title="ผู้สมัครที่ชำระเงินแล้ว"
-          value={String(participants.length)}
-          note={`จาก ${paid.length} ออเดอร์`}
+          value={summary.data ? number(paidParticipants) : "–"}
+          note={`จาก ${summary.data ? number(summary.data.totals.paidOrders) : "–"} ออเดอร์`}
           icon={Users}
         />
         <StatCard
           title="เสื้อที่ต้องเตรียม"
-          value={`${participants.length} ตัว`}
-          note="สำหรับผู้สมัครที่ชำระเงินแล้ว"
+          value={shirts.data ? `${number(shirtTotal)} ตัว` : "–"}
+          note={`สำหรับออเดอร์สถานะ ${statusLabels[shirtStatus]}`}
           icon={Shirt}
         />
       </div>
@@ -131,38 +148,43 @@ export default function ReportsPage() {
           <div className="panel-heading">
             <div>
               <h2>สรุปผู้สมัครตามระยะ</h2>
-              <p>จำนวนที่ยืนยันการชำระเงินแล้ว</p>
+              <p>ผู้สมัครที่มีสิทธิ์และที่ชำระเงินแล้ว</p>
             </div>
             <ClipboardList size={19} aria-hidden="true" />
           </div>
-          {raceRows.length ? (
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>งานวิ่ง</th>
-                    <th>ระยะ</th>
-                    <th className="numeric">ยืนยันแล้ว</th>
-                    <th className="numeric">โควตา</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {raceRows.map((row) => (
-                    <tr key={`${row.event}-${row.race}`}>
-                      <td>{row.event}</td>
-                      <td>
-                        <span className="race-chip">{row.race}</span>
-                      </td>
-                      <td className="numeric strong">{row.count}</td>
-                      <td className="numeric muted">{row.quota}</td>
+          {summary.data &&
+            (rows.length ? (
+              <div className="table-scroll" aria-busy={summary.loading}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>งานวิ่ง</th>
+                      <th>ระยะ</th>
+                      <th className="numeric">ผู้สมัคร</th>
+                      <th className="numeric">ชำระแล้ว</th>
+                      <th className="numeric">ยอดเงิน</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState />
-          )}
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={`${row.eventId}-${row.race}`}>
+                        <td>{row.eventName}</td>
+                        <td>
+                          <span className="race-chip">{row.race}</span>
+                        </td>
+                        <td className="numeric">{number(row.participants)}</td>
+                        <td className="numeric strong">
+                          {number(row.paidParticipants)}
+                        </td>
+                        <td className="numeric muted">{money(row.revenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState />
+            ))}
         </section>
         <section className="panel shirt-summary">
           <div className="panel-heading">
@@ -172,46 +194,66 @@ export default function ReportsPage() {
             </div>
             <Shirt size={19} aria-hidden="true" />
           </div>
-          {sizes.map((size) => {
-            const count = participants.filter((p) => p.size === size).length;
-            return (
-              <div className="shirt-row" key={size}>
-                <span className="size-box">{size}</span>
-                <div>
-                  <progress
-                    value={count}
-                    max={Math.max(1, participants.length)}
-                    aria-label={`เสื้อไซซ์ ${size} ${count} ตัว`}
-                  />
-                </div>
-                <strong>
-                  {count}
-                  <small>ตัว</small>
-                </strong>
-              </div>
-            );
-          })}
-          <button
-            className="button"
-            onClick={() =>
-              exportCsv("shirt-sizes-demo.csv", [
-                ["ไซซ์เสื้อ", "จำนวน"],
-                ...sizes.map((size) => [
-                  size,
-                  participants.filter((p) => p.size === size).length,
-                ]),
-              ])
-            }
-          >
-            <Download size={15} aria-hidden="true" />
-            ส่งออกจำนวนเสื้อ
-          </button>
+          <label>
+            สถานะออเดอร์
+            <select
+              value={shirtStatus}
+              onChange={(e) => setShirtStatus(e.target.value as OrderStatus)}
+            >
+              {ORDER_STATUSES.map((s) => (
+                <option value={s} key={s}>
+                  {statusLabels[s]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {shirts.error && (
+            <ErrorState message={shirts.error} onRetry={shirts.reload} />
+          )}
+          {!shirts.data && shirts.loading && <LoadingState />}
+          {shirts.data && (
+            <>
+              {SHIRT_SIZES.map((size) => {
+                const count =
+                  shirts.data?.sizes.find((item) => item.size === size)?.count ?? 0;
+                return (
+                  <div className="shirt-row" key={size}>
+                    <span className="size-box">{size}</span>
+                    <div>
+                      <progress
+                        value={count}
+                        max={Math.max(1, shirtTotal)}
+                        aria-label={`เสื้อไซซ์ ${size} ${count} ตัว`}
+                      />
+                    </div>
+                    <strong>
+                      {number(count)}
+                      <small>ตัว</small>
+                    </strong>
+                  </div>
+                );
+              })}
+              <button
+                className="button"
+                onClick={() =>
+                  shirts.data &&
+                  clientCsv("shirt-sizes.csv", [
+                    ["ไซซ์เสื้อ", "จำนวน"],
+                    ...SHIRT_SIZES.map((size): (string | number)[] => [
+                      size,
+                      shirts.data?.sizes.find((item) => item.size === size)?.count ?? 0,
+                    ]),
+                  ])
+                }
+              >
+                <Download size={15} aria-hidden="true" />
+                ส่งออกจำนวนเสื้อ
+              </button>
+            </>
+          )}
         </section>
       </div>
-      <p className="page-note">
-        วันที่ใช้เขตเวลาประเทศไทย ·
-        รายงานนี้เป็นข้อมูลสาธิตเพื่อเตรียมรูปแบบการเชื่อมต่อ API
-      </p>
+      <p className="page-note">วันที่ใช้เขตเวลาประเทศไทย</p>
     </>
   );
 }

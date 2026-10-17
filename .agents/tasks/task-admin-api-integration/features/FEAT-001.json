@@ -1,0 +1,23 @@
+{
+    "id":  "FEAT-001",
+    "type":  "feat",
+    "description":  "Foundation: typed API client (src/lib/api/*, constants), auth (proxy.ts, AuthProvider, login form with safeNext, logout, change-password modal), scope/toast providers, useAsync, rewritten shell and layouts. Plan Steps 1-2.",
+    "status":  "completed",
+    "steps":  [
+                  "Follow c:\\Project\\running-event-admin\\.agents\\tasks\\admin-api-integration-plan.md Steps 1 and 2 exactly, incl. amendments A3 and A6/A2 helpers (toEventBody in events module).",
+                  "Read node_modules/next/dist/docs proxy.md before writing src/proxy.ts",
+                  "Keep old pages compiling or migrate them to the new providers as needed so the build stays green (temporary shim for useDemo is allowed only until FEAT-002/003)"
+              ],
+    "acceptance_criteria":  [
+                                "npm run typecheck and npm run build pass",
+                                "safeNext rejects //evil.test, /\\evil.test, https://evil.test, /login and keeps /orders?x=1",
+                                "Shell shows real user, logout, role-gated nav, no demo copy"
+                            ],
+    "verification":  [
+                         "npm run typecheck",
+                         "npm run build with API_PROXY_TARGET=http://localhost:4010 set in same command",
+                         "inline safeNext assertions in a throwaway script (delete after)"
+                     ],
+    "blocked_reason":  null,
+    "findings":  "Done: typecheck + build (API_PROXY_TARGET=http://localhost:4010) pass; safeNext assertions pass (throwaway script deleted). Layout: src/lib/{constants,safe-next}.ts, src/lib/api/{types,errors,query,client,index}.ts + endpoints/*.ts (import via \u0027@/lib/api\u0027: authApi, ordersApi, eventsApi, ... plus get/getPage/mutate/downloadCsv, ApiError, fieldErrorsFor, formMessage, errorMessage). Mutations: mutate\u003cT\u003e(method,path,body); endpoints use *Api.fn. downloadCsv returns {rows} (compare to EXPORT_LIMIT for warning toast). toEventBody + EventForm (string fields) live in endpoints/events.ts. Providers: features/admin/{auth-provider(useAuth: user, logout),scope-provider(useScope: events,eventId,scopeEventId,selectedEvent,setEventId,ready,error,reloadEvents),toast-provider(useToast() returns notify),use-async(useAsync(fn(signal),deps)-\u003e{data,error,loading,reload}),permissions(canWrite,isSuper),format(statusLabels incl upcoming,roleLabels,money,date,number)}. (admin)/layout = AuthProvider\u003eScopeProvider\u003eAdminShell\u003eDemoProvider. TEMP SHIM for FEAT-002/003/004: demo-store.tsx (useDemo, eventId fixed \u0027all\u0027, notify from toast) and data.ts (demo seed + exportCsv; re-exports format) are still used by unmigrated pages; delete in Step 5 and add clientCsv from exportCsv. Old pages therefore show demo data and ignore scope until migrated. PageHeading now uses useScope. Shell: real user, logout, change-password modal, /users hidden for non-super, slips badge from dashboard pendingReview (refetched on pathname change), demo copy removed. proxy.ts matcher per design; build lists \u0027Proxy (Middleware)\u0027. Added small CSS: .profile-actions, .login-form form .button. Note: a concurrent \u0027npm run build\u0027 pipe once left a stale lock; rerun succeeded. Not yet runtime-tested against API (Step 7)."
+}

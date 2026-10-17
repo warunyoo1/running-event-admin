@@ -8,9 +8,14 @@ import {
   ArrowRight,
   CheckCheck,
 } from "lucide-react";
-import { useDemo } from "@/features/admin/demo-store";
-import { date, money, type Order } from "@/features/admin/data";
+import { useScope } from "@/features/admin/scope-provider";
+import { useAsync } from "@/features/admin/use-async";
+import { date, money, number } from "@/features/admin/format";
 import { OrderDetail } from "@/features/admin/order-detail";
+import { dashboardApi, slipsApi } from "@/lib/api";
+import { PAGE_SIZE } from "@/lib/constants";
+import type { SlipRow, SlipTab } from "@/lib/api/types";
+import { ErrorState, LoadingState, Pager } from "@/components/data-states";
 import {
   Badge,
   EmptyState,
@@ -20,20 +25,34 @@ import {
 } from "@/components/ui";
 
 export default function SlipsPage() {
-  const { orders, events, eventId } = useDemo();
-  const [tab, setTab] = useState("waiting");
-  const [selected, setSelected] = useState<string | null>(null);
-  const scoped = orders.filter(
-    (o) => eventId === "all" || o.eventId === eventId,
+  const { scopeEventId } = useScope();
+  const [tab, setTab] = useState<SlipTab>("waiting");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<SlipRow | null>(null);
+  const summary = useAsync(
+    (signal) => dashboardApi.getDashboard(scopeEventId, signal),
+    [scopeEventId],
   );
-  const waiting = scoped.filter((o) => o.status === "slip_uploaded");
-  const history = scoped.filter((o) => o.reviewedAt);
-  const nextWaiting = waiting.toSorted((a, b) =>
-    a.createdAt.localeCompare(b.createdAt),
-  )[0];
-  const filtered = (tab === "waiting" ? waiting : history).toSorted(
-    (a: Order, b: Order) => a.createdAt.localeCompare(b.createdAt),
+  const { data, error, loading, reload } = useAsync(
+    (signal) =>
+      slipsApi.listSlips(
+        { eventId: scopeEventId, tab, page, pageSize: PAGE_SIZE },
+        signal,
+      ),
+    [scopeEventId, tab, page],
   );
+  const rows = data?.data ?? [];
+  const next = tab === "waiting" ? rows[0] : undefined;
+  const counts = summary.data;
+
+  function changeTab(value: SlipTab) {
+    setTab(value);
+    setPage(1);
+  }
+  function changed() {
+    reload();
+    summary.reload();
+  }
   return (
     <>
       <PageHeading
@@ -42,8 +61,8 @@ export default function SlipsPage() {
         action={
           <button
             className="button primary"
-            disabled={!nextWaiting}
-            onClick={() => setSelected(nextWaiting.id)}
+            disabled={!next}
+            onClick={() => next && setSelected(next)}
           >
             <ScanLine size={17} aria-hidden="true" />
             ตรวจรายการถัดไป
@@ -54,22 +73,22 @@ export default function SlipsPage() {
       <div className="stats-grid three">
         <StatCard
           title="สลิปรอตรวจ"
-          value={String(waiting.length)}
+          value={counts ? number(counts.pendingReview) : "–"}
           note="รายการที่ยังไม่ได้ตรวจสอบ"
           icon={ScanLine}
           accent
         />
         <StatCard
-          title="ยอดเงินรอตรวจ"
-          value={money(waiting.reduce((s, o) => s + o.amount, 0))}
-          note="ยังไม่รวมในยอดรับเงิน"
-          icon={CircleDollarSign}
+          title="ชำระเงินแล้ว"
+          value={counts ? number(counts.orders.paid) : "–"}
+          note="ออเดอร์ที่อนุมัติสลิปแล้ว"
+          icon={CheckCheck}
         />
         <StatCard
-          title="ตรวจสอบแล้วในพื้นที่สาธิต"
-          value={String(history.length)}
-          note="ดูผลตรวจได้ที่ประวัติการตรวจ"
-          icon={CheckCheck}
+          title="ยอดชำระเงินแล้ว"
+          value={counts ? money(counts.paidRevenue) : "–"}
+          note="รวมจากออเดอร์ที่ยืนยันแล้ว"
+          icon={CircleDollarSign}
         />
       </div>
       <section className="panel">
@@ -85,9 +104,10 @@ export default function SlipsPage() {
             aria-selected={tab === "waiting"}
             tabIndex={tab === "waiting" ? 0 : -1}
             aria-controls="slips-panel"
-            onClick={() => setTab("waiting")}
+            onClick={() => changeTab("waiting")}
           >
-            รอตรวจสอบ <span>{waiting.length}</span>
+            รอตรวจสอบ
+            {counts && <span>{counts.pendingReview}</span>}
           </button>
           <button
             id="history-tab"
@@ -95,91 +115,95 @@ export default function SlipsPage() {
             aria-selected={tab === "history"}
             tabIndex={tab === "history" ? 0 : -1}
             aria-controls="slips-panel"
-            onClick={() => setTab("history")}
+            onClick={() => changeTab("history")}
           >
-            ประวัติการตรวจ <span>{history.length}</span>
+            ประวัติการตรวจ
+            {tab === "history" && data && <span>{data.meta.total}</span>}
           </button>
         </div>
         <div id="slips-panel" role="tabpanel" aria-labelledby={`${tab}-tab`}>
-          {filtered.length ? (
-            <div className="table-scroll">
-              <table className="table-mobile-cards" role="table">
-                <thead>
-                  <tr>
-                    <th>ออเดอร์ / ผู้ติดต่อ</th>
-                    <th className="table-secondary">งานวิ่ง</th>
-                    <th>ยอดที่ต้องชำระ</th>
-                    <th className="table-secondary">เวลาสร้างออเดอร์</th>
-                    <th>สถานะ</th>
-                    <th>การตรวจสอบ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((order) => (
-                    <tr key={order.id}>
-                      <td className="mobile-record">
-                        <strong>{order.contact}</strong>
-                        <small className="cell-sub">{order.id}</small>
-                      </td>
-                      <td className="table-secondary table-event">
-                        {events.find((e) => e.id === order.eventId)?.name}
-                      </td>
-                      <td
-                        className="strong mobile-amount"
-                        data-label="ยอดที่ต้องชำระ"
-                      >
-                        {money(order.amount)}
-                      </td>
-                      <td className="table-secondary">
-                        <span className="inline-icon muted">
-                          <Clock3 size={14} aria-hidden="true" />
-                          {date(order.createdAt, true)}
-                        </span>
-                      </td>
-                      <td className="mobile-status">
-                        <Badge status={order.status} />
-                      </td>
-                      <td className="mobile-action">
-                        <button
-                          className="button small-button"
-                          onClick={() => setSelected(order.id)}
-                        >
-                          {tab === "waiting" ? "ตรวจสลิป" : "ดูผลตรวจ"}
-                          <ArrowRight size={15} aria-hidden="true" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState
-              title={
-                tab === "waiting"
-                  ? "ไม่มีสลิปรอตรวจแล้ว"
-                  : "ยังไม่มีประวัติการตรวจ"
-              }
-              description={
-                tab === "waiting"
-                  ? "เมื่อมีผู้สมัครส่งหลักฐาน รายการจะปรากฏที่นี่"
-                  : "ลองตรวจสลิปสาธิตสักรายการเพื่อดูผลการตรวจ"
-              }
-            />
-          )}
+          {error && <ErrorState message={error} onRetry={reload} />}
+          {!data && loading && <LoadingState />}
+          {data &&
+            (rows.length ? (
+              <>
+                <div className="table-scroll" aria-busy={loading}>
+                  <table className="table-mobile-cards" role="table">
+                    <thead>
+                      <tr>
+                        <th>ออเดอร์ / ผู้ติดต่อ</th>
+                        <th className="table-secondary">งานวิ่ง</th>
+                        <th>ยอดที่ต้องชำระ</th>
+                        <th className="table-secondary">เวลาส่งสลิป</th>
+                        <th>สถานะ</th>
+                        <th>การตรวจสอบ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.orderId}>
+                          <td className="mobile-record">
+                            <strong>{row.contactName}</strong>
+                            <small className="cell-sub">{row.orderNo}</small>
+                          </td>
+                          <td className="table-secondary table-event">
+                            {row.eventName}
+                          </td>
+                          <td
+                            className="strong mobile-amount"
+                            data-label="ยอดที่ต้องชำระ"
+                          >
+                            {money(row.amount)}
+                          </td>
+                          <td className="table-secondary">
+                            <span className="inline-icon muted">
+                              <Clock3 size={14} aria-hidden="true" />
+                              {row.slipUploadedAt
+                                ? date(row.slipUploadedAt, true)
+                                : "–"}
+                            </span>
+                          </td>
+                          <td className="mobile-status">
+                            <Badge status={row.status} />
+                          </td>
+                          <td className="mobile-action">
+                            <button
+                              className="button small-button"
+                              onClick={() => setSelected(row)}
+                            >
+                              {tab === "waiting" ? "ตรวจสลิป" : "ดูผลตรวจ"}
+                              <ArrowRight size={15} aria-hidden="true" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pager meta={data.meta} unit="รายการ" onPage={setPage} />
+              </>
+            ) : (
+              <EmptyState
+                title={
+                  tab === "waiting"
+                    ? "ไม่มีสลิปรอตรวจแล้ว"
+                    : "ยังไม่มีประวัติการตรวจ"
+                }
+                description={
+                  tab === "waiting"
+                    ? "เมื่อมีผู้สมัครส่งหลักฐาน รายการจะปรากฏที่นี่"
+                    : "รายการที่ตรวจแล้วจะปรากฏที่นี่"
+                }
+              />
+            ))}
         </div>
       </section>
-      <p className="page-note">
-        สลิปในหน้านี้เป็นแบบจำลองเพื่อทดสอบ UX/UI
-        ไม่มีการตรวจสอบธุรกรรมธนาคารจริง
-      </p>
       {selected && (
         <OrderDetail
-          orderId={selected}
-          review={
-            orders.find((order) => order.id === selected)?.status ===
-            "slip_uploaded"
-          }
+          orderId={selected.orderId}
+          paymentId={selected.paymentId}
+          review={selected.status === "slip_uploaded"}
+          onChanged={changed}
           onClose={() => setSelected(null)}
         />
       )}
