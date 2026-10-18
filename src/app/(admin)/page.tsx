@@ -17,17 +17,17 @@ import {
 import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { clientCsv } from "@/features/admin/client-csv";
-import { artTheme, date, money, number } from "@/features/admin/format";
+import { date, money, number } from "@/features/admin/format";
 import { dashboardApi, ordersApi } from "@/lib/api";
 import type { DashboardData, OrderStatus } from "@/lib/api/types";
 import { ErrorState, LoadingState } from "@/components/data-states";
 import {
   Badge,
   EmptyState,
-  EventArtwork,
   PageHeading,
   StatCard,
 } from "@/components/ui";
+import { EventCover } from "@/components/event-cover";
 
 const RECENT_ORDERS = 5;
 const STATUS_ORDER: OrderStatus[] = [
@@ -336,7 +336,7 @@ export default function DashboardPage() {
               className="upcoming-card"
               href={`/events?event=${event.id}`}
             >
-              <EventArtwork theme={artTheme(event.theme)} compact />
+              <EventCover event={event} compact />
               <div>
                 <Badge status={event.status} />
                 <h3>{event.name}</h3>

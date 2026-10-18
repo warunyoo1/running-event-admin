@@ -38,6 +38,8 @@ HTTP warning: with plain HTTP, credentials travel in clear text between Next and
 
 ## Event images
 
+Event cards (and the dashboard's upcoming list) show a real image via `EventCover`: the first `cover` by sort order, else the first `poster`, else the first image of any kind, else the theme artwork. It uses `previewUrl` (works for drafts), falls back to the artwork if the file fails to load, and shows an "รูป N" badge when the event has more than one image. "ดูรูปภาพ" on each card opens a read-only panel (all roles) grouped by kind, with a keyboard-friendly lightbox.
+
 The events dialog ("ตั้งค่างานวิ่ง") has a "รูปภาพ" section. An event can hold up to 30 images; each has a kind (cover, poster, gallery, route map, shirt, medal, sponsor, other), an optional alt text and a sort order.
 
 - Permissions: only `super_admin` sees the picker and the kind/alt/reorder/delete controls (`isSuper`). Other roles see the thumbnails read-only.

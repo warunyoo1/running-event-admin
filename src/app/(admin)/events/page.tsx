@@ -24,7 +24,6 @@ import { useDebounced } from "@/features/admin/use-debounced";
 import { useToast } from "@/features/admin/toast-provider";
 import { isSuper } from "@/features/admin/permissions";
 import {
-  artTheme,
   categoryLabels,
   date,
   money,
@@ -48,10 +47,11 @@ import { ApiError } from "@/lib/api/errors";
 import type { AdminEvent, EventStatus } from "@/lib/api/types";
 import type { EventForm } from "@/lib/api/endpoints/events";
 import { ErrorState, LoadingState, Pager } from "@/components/data-states";
+import { EventCover } from "@/components/event-cover";
+import { EventImagesPanel } from "@/features/admin/event-images-panel";
 import {
   Badge,
   EmptyState,
-  EventArtwork,
   Modal,
   PageHeading,
   SearchField,
@@ -151,6 +151,7 @@ function Events() {
   const [status, setStatus] = useState<EventStatus | "">("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [viewing, setViewing] = useState<AdminEvent | null>(null);
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
@@ -324,7 +325,7 @@ function Events() {
                 const lowest = Math.min(...event.races.map((race) => race.price));
                 return (
                   <article className="event-card" key={event.id}>
-                    <EventArtwork theme={artTheme(event.theme)} />
+                    <EventCover event={event} />
                     <div className="event-card-body">
                       <div className="event-card-meta">
                         <Badge status={event.status} />
@@ -358,12 +359,17 @@ function Events() {
                       </div>
                       <div className="event-card-footer">
                         <span>เริ่มต้น {money(lowest)}</span>
-                        {canEdit && (
-                          <button className="text-link" onClick={() => open(editingFrom(event))}>
-                            จัดการงาน
-                            <ArrowUpRight size={16} aria-hidden="true" />
+                        <div className="event-card-actions">
+                          <button className="text-link" onClick={() => setViewing(event)}>
+                            ดูรูปภาพ
                           </button>
-                        )}
+                          {canEdit && (
+                            <button className="text-link" onClick={() => open(editingFrom(event))}>
+                              จัดการงาน
+                              <ArrowUpRight size={16} aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </article>
@@ -375,6 +381,11 @@ function Events() {
         ) : (
           <EmptyState title="ไม่พบงานวิ่ง" />
         ))}
+      {viewing && (
+        <Modal title={`รูปภาพ: ${viewing.name}`} onClose={() => setViewing(null)}>
+          <EventImagesPanel event={viewing} />
+        </Modal>
+      )}
       {editing && form && (
         <Modal
           title={editing.id ? "ตั้งค่างานวิ่ง" : "สร้างงานวิ่ง"}
