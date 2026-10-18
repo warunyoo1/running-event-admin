@@ -1,4 +1,9 @@
-import type { EVENT_CATEGORIES, EVENT_THEMES, SHIRT_SIZES } from "../constants";
+import type {
+  EVENT_CATEGORIES,
+  EVENT_IMAGE_KINDS,
+  EVENT_THEMES,
+  SHIRT_SIZES,
+} from "../constants";
 
 export type Role = "super_admin" | "reviewer" | "viewer";
 export type OrderStatus =
@@ -9,6 +14,7 @@ export type PaymentStatus = "submitted" | "approved" | "rejected" | "superseded"
 export type EventTheme = (typeof EVENT_THEMES)[number];
 export type EventCategory = (typeof EVENT_CATEGORIES)[number];
 export type ShirtSize = (typeof SHIRT_SIZES)[number];
+export type EventImageKind = (typeof EVENT_IMAGE_KINDS)[number];
 
 export type PageMeta = {
   page: number;
@@ -16,7 +22,13 @@ export type PageMeta = {
   total: number;
   totalPages: number;
 };
-export type Paginated<T> = { data: T[]; meta: PageMeta };
+/** Optional envelope fields the API adds to every JSON response (not read by the client yet). */
+export type ApiEnvelopeFields = {
+  statusCode?: number;
+  success?: boolean;
+  message?: string;
+};
+export type Paginated<T> = ApiEnvelopeFields & { data: T[]; meta: PageMeta };
 export type PageQuery = { page?: number; pageSize?: number };
 
 export type User = {
@@ -38,6 +50,21 @@ export type Race = {
   start: string | null;
   remaining: number;
 };
+export type EventImage = {
+  id: string;
+  kind: EventImageKind;
+  alt: string;
+  sortOrder: number;
+  /** Public path (relative to the API), for the public site. */
+  url: string;
+  /** Same-origin admin path for thumbnails (also works for draft events). */
+  previewUrl: string;
+  mime: string;
+  size: number;
+  createdAt: string | null;
+};
+export type ImagePatchBody = { kind?: EventImageKind; alt?: string; sortOrder?: number };
+
 export type AdminEvent = {
   id: string;
   name: string;
@@ -58,6 +85,7 @@ export type AdminEvent = {
   updatedAt: string;
   orderCount: number;
   races: Race[];
+  images: EventImage[];
 };
 
 export type Address = {

@@ -34,7 +34,19 @@ HTTP warning: with plain HTTP, credentials travel in clear text between Next and
 
 - `viewer`: read and export only.
 - `reviewer`: also cancel, approve, reject, tracking, BIB and collected updates.
-- `super_admin`: also create/edit events and manage users.
+- `super_admin`: also create/edit events, manage event images and manage users.
+
+## Event images
+
+The events dialog ("ตั้งค่างานวิ่ง") has a "รูปภาพ" section. An event can hold up to 30 images; each has a kind (cover, poster, gallery, route map, shirt, medal, sponsor, other), an optional alt text and a sort order.
+
+- Permissions: only `super_admin` sees the picker and the kind/alt/reorder/delete controls (`isSuper`). Other roles see the thumbnails read-only.
+- Upload: keyboard-operable drop zone with multi-file picker. The kind and alt chosen above it apply to the files picked in that batch. Files are sent one per request (`POST /events/:id/images`, `FormData`; `client.ts` leaves `Content-Type` to the browser) so each file reports its own result; progress is "n of N" in a live region.
+- Pre-check mirrors the API limits (JPG/PNG/WEBP, 5 MB per file, 10 per batch, 30 per event; `src/lib/constants.ts`, keep in sync with the API `config/constants.ts`). The API still decides by magic bytes.
+- Errors map from `ApiError` to Thai text (`imageErrorMessage` in `features/admin/event-images.tsx`): 413 too large, 415 type, 422 `TOO_MANY_FILES` / `IMAGE_LIMIT_REACHED`, 403, 404, 409 (list reloads), 429.
+- Thumbnails are plain `<img>` with fixed `width`/`height` and CSS `aspect-ratio`. They load from the same-origin `previewUrl` (`/api/v1/admin/events/:id/images/:imageId/file`) through the `/api` rewrite, so the auth cookie is sent and images of draft events can be previewed. The public `url` (`/api/v1/public/event-images/:id`) is what the public site uses and only works for non-draft events.
+- After creating an event the dialog stays open on the new event so images can be added right away.
+- Delete asks for an inline confirmation. Reorder uses up/down buttons and calls `PUT /events/:id/images/order`.
 
 ## Layout
 
@@ -43,7 +55,7 @@ src/proxy.ts                  optimistic guard: no rr_admin_token cookie -> /log
 src/app/(admin)/*/page.tsx    client pages (dashboard, events, orders, slips, participants, shipping, reports, users)
 src/app/login/page.tsx        server page, renders components/login-form.tsx
 src/components/               shell, shared UI, data states, login and change-password
-src/features/admin/           providers (auth, scope, toast), use-async, permissions, format, client-csv, order-detail
+src/features/admin/           providers (auth, scope, toast), use-async, permissions, format, client-csv, order-detail, event-images
 src/lib/constants.ts          API_BASE, cookie name, page size, export limit, labels
 src/lib/safe-next.ts          open-redirect-safe `next` handling
 src/lib/api/                  types, errors, query, client, endpoints/*

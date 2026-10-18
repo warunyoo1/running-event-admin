@@ -14,12 +14,16 @@ export const UNKNOWN_ERROR_MESSAGE = "เกิดข้อผิดพลาด
 
 /** Field errors keyed by the API's dotted path (e.g. `races.0.quota`). */
 export function fieldErrorsFor(error: unknown): Record<string, string> {
-  return error instanceof ApiError ? error.fields : {};
+  if (!(error instanceof ApiError)) return {};
+  // The API sends 409 SLUG_TAKEN without `fields`; attach it to the slug input.
+  if (error.code === "SLUG_TAKEN") return { ...error.fields, slug: "ลิงก์นี้ถูกใช้แล้ว" };
+  return error.fields;
 }
 
 /** Form-level message; empty when the error is fully explained by field errors. */
 export function formMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return UNKNOWN_ERROR_MESSAGE;
+  if (error.code === "SLUG_TAKEN") return "";
   return Object.keys(error.fields).length > 0 ? "" : error.message;
 }
 

@@ -1,5 +1,6 @@
 export * as authApi from "./endpoints/auth";
 export * as dashboardApi from "./endpoints/dashboard";
+export * as eventImagesApi from "./endpoints/event-images";
 export * as eventsApi from "./endpoints/events";
 export * as exportsApi from "./endpoints/exports";
 export * as ordersApi from "./endpoints/orders";

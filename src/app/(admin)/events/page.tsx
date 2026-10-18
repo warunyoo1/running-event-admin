@@ -12,6 +12,12 @@ import {
   Save,
 } from "lucide-react";
 import { useAuth } from "@/features/admin/auth-provider";
+import {
+  EventImagesSection,
+  StagedImagesSection,
+  uploadFiles,
+  useStagedImages,
+} from "@/features/admin/event-images";
 import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useDebounced } from "@/features/admin/use-debounced";
@@ -29,6 +35,16 @@ import {
 import { eventsApi } from "@/lib/api";
 import { fieldErrorsFor, formMessage } from "@/lib/api/errors";
 import { EVENT_CATEGORIES, EVENT_THEMES, PAGE_SIZE } from "@/lib/constants";
+import {
+  SLUG_MAX,
+  SLUG_PATTERN,
+  SLUG_TAKEN_CODE,
+  isThaiFallback,
+  nextSlugVariant,
+  randomSuffix,
+  slugify,
+} from "@/lib/slug";
+import { ApiError } from "@/lib/api/errors";
 import type { AdminEvent, EventStatus } from "@/lib/api/types";
 import type { EventForm } from "@/lib/api/endpoints/events";
 import { ErrorState, LoadingState, Pager } from "@/components/data-states";
@@ -43,7 +59,6 @@ import {
 
 const EVENT_STATUSES: EventStatus[] = ["draft", "open", "closed", "upcoming"];
 const NAME_MAX = 200;
-const SLUG_MAX = 120;
 const VENUE_MAX = 300;
 const SUBTITLE_MAX = 300;
 const DESCRIPTION_MAX = 5000;
@@ -110,8 +125,12 @@ function editingFrom(event: AdminEvent): Editing {
   };
 }
 
-function FieldError({ message }: { message?: string }) {
-  return message ? <span className="form-error">{message}</span> : null;
+function FieldError({ message, id }: { message?: string; id?: string }) {
+  return message ? (
+    <span className="form-error" id={id}>
+      {message}
+    </span>
+  ) : null;
 }
 
 export default function EventsPage() {
@@ -135,6 +154,12 @@ function Events() {
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const [uploadFailures, setUploadFailures] = useState<{ name: string; reason: string }[]>([]);
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [slugSuggestion, setSlugSuggestion] = useState("");
+  const slugSuffix = useRef("");
+  const staged = useStagedImages();
   const deepLinked = useRef(false);
   const q = useDebounced(query.trim());
   const { data, error: loadError, loading, reload } = useAsync(
@@ -154,7 +179,19 @@ function Events() {
   function open(next: Editing) {
     setError("");
     setFields({});
+    setUploadStatus("");
+    setUploadFailures([]);
+    staged.clear();
+    setSlugTouched(false);
+    setSlugSuggestion("");
+    slugSuffix.current = randomSuffix();
     setEditing(next);
+  }
+  function close() {
+    staged.clear();
+    setUploadStatus("");
+    setUploadFailures([]);
+    setEditing(null);
   }
   function changeFilter(apply: () => void) {
     apply();
@@ -164,6 +201,23 @@ function Events() {
     setEditing((current) =>
       current ? { ...current, form: { ...current.form, ...patch } } : current,
     );
+  }
+  /** Create flow only: keep the slug following name/date until the user edits it. */
+  function setAutoSlug(patch: Partial<EventForm>) {
+    setEditing((current) => {
+      if (!current) return current;
+      const next = { ...current.form, ...patch };
+      if (!current.id && !slugTouched) {
+        next.slug = slugify(next.name, { date: next.date, suffix: slugSuffix.current });
+      }
+      return { ...current, form: next };
+    });
+  }
+  function changeSlug(value: string) {
+    setSlugSuggestion("");
+    // Emptying the field hands control back to the name (applies on the next name change or blur).
+    setSlugTouched(value !== "");
+    setForm({ slug: value });
   }
   function setRace(index: number, patch: Partial<RaceForm>) {
     if (!editing) return;
@@ -178,16 +232,41 @@ function Events() {
     setPending(true);
     setError("");
     setFields({});
+    setUploadFailures([]);
     try {
       const body = eventsApi.toEventBody(editing.form);
-      if (editing.id) await eventsApi.updateEvent(editing.id, body);
-      else await eventsApi.createEvent(body);
-      notify("บันทึกงานวิ่งแล้ว");
-      setEditing(null);
+      if (editing.id) {
+        await eventsApi.updateEvent(editing.id, body);
+        notify("บันทึกงานวิ่งแล้ว");
+        setEditing(null);
+      } else {
+        // Keep the dialog open on the new event so images can be added right away.
+        const created = await eventsApi.createEvent(body);
+        const pendingFiles = staged.items;
+        if (pendingFiles.length === 0) {
+          notify("สร้างงานวิ่งแล้ว เพิ่มรูปภาพได้เลย");
+        } else {
+          const result = await uploadFiles(created.id, pendingFiles, (n, total) =>
+            setUploadStatus(`กำลังอัปโหลดรูป ${n} จาก ${total} ไฟล์…`),
+          );
+          setUploadStatus(`อัปโหลดสำเร็จ ${result.done} จาก ${pendingFiles.length} ไฟล์`);
+          setUploadFailures(result.failures);
+          notify(
+            result.failures.length === 0
+              ? `สร้างงานวิ่งและอัปโหลดรูป ${result.done} รูปแล้ว`
+              : `สร้างงานวิ่งแล้ว แต่อัปโหลดรูปไม่สำเร็จ ${result.failures.length} ไฟล์ ลองเพิ่มใหม่ในส่วนรูปภาพ`,
+          );
+          staged.clear();
+        }
+        setEditing(editingFrom(created));
+      }
       reload();
       reloadEvents();
     } catch (failure) {
       setFields(fieldErrorsFor(failure));
+      if (failure instanceof ApiError && failure.code === SLUG_TAKEN_CODE) {
+        setSlugSuggestion(nextSlugVariant(editing.form.slug));
+      }
       setError(formMessage(failure));
     } finally {
       setPending(false);
@@ -299,7 +378,7 @@ function Events() {
       {editing && form && (
         <Modal
           title={editing.id ? "ตั้งค่างานวิ่ง" : "สร้างงานวิ่ง"}
-          onClose={() => setEditing(null)}
+          onClose={close}
           wide
         >
           <form onSubmit={save}>
@@ -317,7 +396,7 @@ function Events() {
                   maxLength={NAME_MAX}
                   value={form.name}
                   aria-invalid={Boolean(fields.name)}
-                  onChange={(e) => setForm({ name: e.target.value })}
+                  onChange={(e) => setAutoSlug({ name: e.target.value })}
                 />
                 <FieldError message={fields.name} />
               </label>
@@ -326,14 +405,42 @@ function Events() {
                 <input
                   required
                   maxLength={SLUG_MAX}
-                  pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                  pattern={SLUG_PATTERN}
                   title="ใช้ตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีดกลาง เช่น bangkok-run-2027"
                   value={form.slug}
                   aria-invalid={Boolean(fields.slug)}
-                  onChange={(e) => setForm({ slug: e.target.value })}
+                  aria-describedby={`slug-hint${fields.slug ? " slug-error" : ""}`}
+                  onChange={(e) => changeSlug(e.target.value)}
+                  onBlur={() => {
+                    if (!editing.id && form.slug === "") setAutoSlug({});
+                  }}
                 />
-                <small>ใช้ตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีดกลาง</small>
-                <FieldError message={fields.slug} />
+                <small id="slug-hint">
+                  ใช้ตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีดกลาง
+                  {editing.id
+                    ? " · คำเตือน: การเปลี่ยน slug จะทำให้ลิงก์สาธารณะของงานนี้เปลี่ยน ลิงก์เดิมจะใช้ไม่ได้"
+                    : slugTouched
+                      ? ""
+                      : " · สร้างจากชื่องานอัตโนมัติ แก้ไขเองได้"}
+                  {!editing.id &&
+                    isThaiFallback(form.name) &&
+                    " · ชื่อภาษาไทยต้องตั้ง slug เป็นภาษาอังกฤษ"}
+                </small>
+                <FieldError message={fields.slug} id="slug-error" />
+                {slugSuggestion && fields.slug && (
+                  <button
+                    type="button"
+                    className="button small-button"
+                    onClick={() => {
+                      setSlugTouched(true);
+                      setForm({ slug: slugSuggestion });
+                      setSlugSuggestion("");
+                      setFields((f) => ({ ...f, slug: "" }));
+                    }}
+                  >
+                    ลองใช้ {slugSuggestion}
+                  </button>
+                )}
               </label>
               <label className="full">
                 คำโปรย
@@ -363,7 +470,7 @@ function Events() {
                   type="date"
                   value={form.date}
                   aria-invalid={Boolean(fields.date)}
-                  onChange={(e) => setForm({ date: e.target.value })}
+                  onChange={(e) => setAutoSlug({ date: e.target.value })}
                 />
                 <FieldError message={fields.date} />
               </label>
@@ -562,9 +669,34 @@ function Events() {
                   </button>
                 )}
               </fieldset>
+              {editing.id && original ? (
+                <EventImagesSection
+                  key={editing.id}
+                  event={original}
+                  canEdit={canEdit}
+                  onChange={() => {
+                    reload();
+                    reloadEvents();
+                  }}
+                />
+              ) : (
+                <StagedImagesSection staged={staged} busy={pending} status={uploadStatus} />
+              )}
+              {editing.id && uploadFailures.length > 0 && (
+                <div className="form-error full" role="alert">
+                  <p>อัปโหลดรูปไม่สำเร็จ {uploadFailures.length} ไฟล์ (สร้างงานวิ่งเรียบร้อยแล้ว)</p>
+                  <ul>
+                    {uploadFailures.map((f, i) => (
+                      <li key={`${f.name}-${i}`}>
+                        {f.name}: {f.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
             <div className="modal-actions">
-              <button className="button" type="button" onClick={() => setEditing(null)}>
+              <button className="button" type="button" onClick={close}>
                 ยกเลิก
               </button>
               <button className="button primary" type="submit" disabled={pending}>
