@@ -8,7 +8,12 @@ import type {
   PageQuery,
 } from "../types";
 
-export type EventFilters = PageQuery & { q?: string; status?: EventStatus | "" };
+export type EventFilters = PageQuery & {
+  q?: string;
+  status?: EventStatus | "";
+  /** `true` lists archived events; the API default is active events only. */
+  archived?: boolean;
+};
 
 export const listEvents = (filters: EventFilters, signal?: AbortSignal) =>
   getPage<AdminEvent>("/events", filters, signal);
@@ -17,6 +22,12 @@ export const getEvent = (id: string, signal?: AbortSignal) =>
 export const createEvent = (body: EventBody) => mutate<AdminEvent>("POST", "/events", body);
 export const updateEvent = (id: string, body: EventBody) =>
   mutate<AdminEvent>("PUT", `/events/${id}`, body);
+export const archiveEvent = (id: string) =>
+  mutate<AdminEvent>("POST", `/events/${id}/archive`);
+export const restoreEvent = (id: string) =>
+  mutate<AdminEvent>("POST", `/events/${id}/restore`);
+/** Hard delete; the API refuses (409 EVENT_HAS_ORDERS) when the event has any order. */
+export const deleteEvent = (id: string) => mutate<null>("DELETE", `/events/${id}`);
 
 export type EventForm = {
   name: string;
@@ -36,9 +47,10 @@ export type EventForm = {
 };
 
 /**
- * PUT `$set`s the provided fields. Typed optionals (category, theme,
- * registrationEnds, race start) are omitted when empty because they cannot be
- * cleared; plain strings are sent trimmed so '' clears them.
+ * Typed optionals (category, theme, registrationEnds, race start) are sent as
+ * `null` when empty so PUT clears them (category/theme fall back to the API
+ * defaults; the API ignores nulls on create). Plain strings are sent trimmed
+ * so '' clears them.
  */
 export function toEventBody(form: EventForm): EventBody {
   const body: EventBody = {
@@ -57,11 +69,11 @@ export function toEventBody(form: EventForm): EventBody {
       name: race.name.trim(),
       price: Number(race.price),
       quota: Number(race.quota),
-      ...(race.start ? { start: race.start } : {}),
+      start: race.start || null,
     })),
+    category: form.category || null,
+    theme: form.theme || null,
+    registrationEnds: form.registrationEnds || null,
   };
-  if (form.category) body.category = form.category;
-  if (form.theme) body.theme = form.theme;
-  if (form.registrationEnds) body.registrationEnds = form.registrationEnds;
   return body;
 }

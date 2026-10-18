@@ -1,4 +1,5 @@
 import type {
+  AUDIT_ENTITIES,
   EVENT_CATEGORIES,
   EVENT_IMAGE_KINDS,
   EVENT_THEMES,
@@ -38,6 +39,7 @@ export type User = {
   role: Role;
   active: boolean;
   lastLoginAt?: string;
+  mustChangePassword?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -174,9 +176,39 @@ export type Payment = {
   createdAt: string;
   updatedAt: string;
 };
+export type OrderNote = {
+  id: string;
+  orderId: string;
+  text: string;
+  createdAt: string;
+  author: { id: string; name: string } | null;
+};
+export type TimelineKind =
+  | "created"
+  | "slip_uploaded"
+  | "slip_rejected"
+  | "paid"
+  | "cancelled"
+  | "expired"
+  | "tracking_set"
+  | "address_updated"
+  | "note";
+export type OrderTimelineEntry = {
+  id: string;
+  kind: TimelineKind;
+  at: string;
+  actor: { id: string; name: string } | null;
+  detail: string | null;
+};
+/** Body of PATCH /orders/:id/address (same fields as the stored address). */
+export type AddressBody = Address;
 export type OrderDetail = AdminOrderRow & {
   participants: AdminParticipant[];
   payments: Payment[];
+  reviewedByName: string | null;
+  canEditAddress: boolean;
+  notes: OrderNote[];
+  timeline: OrderTimelineEntry[];
 };
 
 export type SlipTab = "waiting" | "history";
@@ -261,7 +293,8 @@ export type RaceBody = {
   name: string;
   price: number;
   quota: number;
-  start?: string;
+  /** `null` clears the start time. */
+  start?: string | null;
 };
 export type EventBody = {
   name: string;
@@ -271,10 +304,12 @@ export type EventBody = {
   date: string;
   venue: string;
   province?: string;
-  category?: EventCategory;
-  theme?: EventTheme;
+  /** `null` resets to the API default. */
+  category?: EventCategory | null;
+  theme?: EventTheme | null;
   status: EventStatus;
-  registrationEnds?: string;
+  /** `null` clears the date. */
+  registrationEnds?: string | null;
   organizer?: string;
   refundPolicy?: string;
   races: RaceBody[];
@@ -288,6 +323,7 @@ export type UserCreateBody = {
   role: Role;
 };
 export type UserPatchBody = {
+  email?: string;
   name?: string;
   role?: Role;
   active?: boolean;
@@ -295,3 +331,22 @@ export type UserPatchBody = {
 };
 
 export type Query = Record<string, string | number | boolean | null | undefined>;
+
+export type AuditEntity = (typeof AUDIT_ENTITIES)[number];
+export type AuditLogFilters = PageQuery & {
+  userId?: string;
+  action?: string;
+  entity?: AuditEntity | "";
+  entityId?: string;
+  from?: string;
+  to?: string;
+};
+export type AuditLogEntry = {
+  id: string;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  meta: Record<string, unknown> | null;
+  actor: { id: string; name: string; email: string } | null;
+  createdAt: string;
+};

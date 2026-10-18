@@ -6,6 +6,7 @@ import { useAuth } from "@/features/admin/auth-provider";
 import { canWrite } from "@/features/admin/permissions";
 import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
+import { useDebounced } from "@/features/admin/use-debounced";
 import { useToast } from "@/features/admin/toast-provider";
 import { formatAddress } from "@/features/admin/format";
 import { exportsApi, ordersApi, participantsApi, shippingApi } from "@/lib/api";
@@ -124,26 +125,19 @@ export default function ShippingPage() {
   const [tab, setTab] = useState<ShippingMethod>("pickup");
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
+  const q = useDebounced(query.trim());
   const [editing, setEditing] = useState<ShippingRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const { data, error, loading, reload } = useAsync(
     (signal) =>
       shippingApi.listShipping(
-        { eventId: scopeEventId, method: tab, page, pageSize: PAGE_SIZE },
+        { eventId: scopeEventId, method: tab, q, page, pageSize: PAGE_SIZE },
         signal,
       ),
-    [scopeEventId, tab, page],
+    [scopeEventId, tab, q, page],
   );
   const writable = canWrite(user.role);
-  const needle = query.trim().toLowerCase();
-  const rows = (data?.data ?? []).filter(
-    (o) =>
-      !needle ||
-      `${o.contactName} ${o.orderNo} ${o.trackingNo ?? ""} ${o.participants.map((p) => `${p.name} ${p.bibNo ?? ""}`).join(" ")}`
-        .toLowerCase()
-        .includes(needle),
-  );
 
   async function toggleCollected(id: string, collected: boolean) {
     setBusyId(id);
@@ -163,6 +157,7 @@ export default function ShippingPage() {
       const { rows: count } = await exportsApi.exportFulfillmentCsv({
         eventId: scopeEventId,
         method: tab,
+        q,
       });
       if (count >= EXPORT_LIMIT) {
         notify(`ส่งออกได้สูงสุด ${EXPORT_LIMIT.toLocaleString("th-TH")} รายการ ข้อมูลอาจไม่ครบ`);
@@ -172,6 +167,10 @@ export default function ShippingPage() {
     } finally {
       setExporting(false);
     }
+  }
+  function changeQuery(value: string) {
+    setQuery(value);
+    setPage(1);
   }
   function changeTab(value: ShippingMethod) {
     setTab(value);
@@ -228,10 +227,10 @@ export default function ShippingPage() {
         <div className="filter-bar in-panel">
           <SearchField
             value={query}
-            onChange={setQuery}
-            placeholder="ค้นหาในหน้านี้: ชื่อ เลข BIB ออเดอร์ หรือเลขพัสดุ"
+            onChange={changeQuery}
+            placeholder="ค้นหาชื่อ เลขออเดอร์ เบอร์โทร เลขพัสดุ หรือเลข BIB"
           />
-          <span className="result-count">{rows.length} ออเดอร์ในหน้านี้</span>
+          <span className="result-count">{data ? data.meta.total : 0} ออเดอร์</span>
         </div>
         <div
           id="fulfillment-panel"
@@ -241,7 +240,7 @@ export default function ShippingPage() {
           {error && <ErrorState message={error} onRetry={reload} />}
           {!data && loading && <LoadingState />}
           {data &&
-            (rows.length ? (
+            (data.data.length ? (
               <>
                 <div className="table-scroll" aria-busy={loading}>
                   <table>
@@ -257,7 +256,7 @@ export default function ShippingPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((order) => (
+                      {data.data.map((order) => (
                         <tr key={order.orderId}>
                           <td className="strong">{order.orderNo}</td>
                           <td>

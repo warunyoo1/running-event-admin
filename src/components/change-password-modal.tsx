@@ -10,7 +10,17 @@ import { Modal } from "./ui";
 const MIN_PASSWORD = 10;
 const MAX_PASSWORD = 200;
 
-export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+export function ChangePasswordModal({
+  onClose,
+  notice,
+  onChanged,
+}: {
+  onClose: () => void;
+  /** Optional line shown above the form (e.g. the temporary-password nudge). */
+  notice?: string;
+  /** Called after the password was changed successfully. */
+  onChanged?: () => void;
+}) {
   const notify = useToast();
   const [currentPassword, setCurrent] = useState("");
   const [newPassword, setNew] = useState("");
@@ -26,6 +36,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     try {
       await authApi.changePassword({ currentPassword, newPassword });
       notify("เปลี่ยนรหัสผ่านแล้ว");
+      onChanged?.();
       onClose();
     } catch (reason) {
       setFields(fieldErrorsFor(reason));
@@ -38,6 +49,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     <Modal title="เปลี่ยนรหัสผ่าน" onClose={onClose}>
       <form onSubmit={submit}>
         <div className="modal-body form-grid">
+          {notice && <p className="full">{notice}</p>}
           {error && (
             <p className="form-error full" role="alert">
               {error}

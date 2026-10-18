@@ -19,6 +19,7 @@ import {
   LogOut,
   KeyRound,
   CircleHelp,
+  History,
 } from "lucide-react";
 import { useAuth } from "@/features/admin/auth-provider";
 import { useScope } from "@/features/admin/scope-provider";
@@ -28,11 +29,19 @@ import { isSuper } from "@/features/admin/permissions";
 import { roleLabels } from "@/features/admin/format";
 import { dashboardApi } from "@/lib/api";
 import { errorMessage } from "@/lib/api/errors";
-import { ALL_EVENTS } from "@/lib/constants";
+import { ALL_EVENTS, MUST_CHANGE_PASSWORD_SHOWN_KEY } from "@/lib/constants";
 import { ChangePasswordModal } from "./change-password-modal";
 import { Modal } from "./ui";
 
-const navigation = [
+type NavItem = {
+  href: string;
+  title: string;
+  icon: typeof Flag;
+  scope: "event" | "global";
+  superOnly?: boolean;
+};
+
+const navigation: NavItem[] = [
   { href: "/", title: "ภาพรวม", icon: LayoutDashboard, scope: "event" },
   { href: "/orders", title: "ออเดอร์", icon: ShoppingBag, scope: "event" },
   { href: "/slips", title: "ตรวจสลิป", icon: ScanLine, scope: "event" },
@@ -55,12 +64,20 @@ const navigation = [
     title: "ผู้ใช้และสิทธิ์",
     icon: ShieldCheck,
     scope: "global",
+    superOnly: true,
+  },
+  {
+    href: "/audit-logs",
+    title: "ประวัติการใช้งาน",
+    icon: History,
+    scope: "global",
+    superOnly: true,
   },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, refresh } = useAuth();
   const notify = useToast();
   const {
     events,
@@ -74,6 +91,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordNudge, setPasswordNudge] = useState(false);
   const [mobile, setMobile] = useState(false);
   const sidebar = useRef<HTMLElement>(null);
   const currentPage = navigation.find((item) => item.href === pathname);
@@ -87,8 +105,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     ).data?.pendingReview ?? 0;
   const initials = user.name.trim().slice(0, 2).toUpperCase();
   const visibleNavigation = navigation.filter(
-    (item) => item.href !== "/users" || isSuper(user.role),
+    (item) => !item.superOnly || isSuper(user.role),
   );
+  const mustChangePassword = Boolean(user.mustChangePassword);
+  useEffect(() => {
+    if (!mustChangePassword) return;
+    try {
+      if (sessionStorage.getItem(MUST_CHANGE_PASSWORD_SHOWN_KEY)) return;
+      sessionStorage.setItem(MUST_CHANGE_PASSWORD_SHOWN_KEY, "1");
+    } catch {
+      // Storage can be blocked; showing the dismissible nudge again is harmless.
+    }
+    setPasswordNudge(true);
+  }, [mustChangePassword]);
   useEffect(() => {
     if (scopeError) notify(scopeError);
   }, [scopeError, notify]);
@@ -330,7 +359,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </footer>
       </div>
       {passwordOpen && (
-        <ChangePasswordModal onClose={() => setPasswordOpen(false)} />
+        <ChangePasswordModal
+          onClose={() => setPasswordOpen(false)}
+          onChanged={refresh}
+        />
+      )}
+      {passwordNudge && !passwordOpen && (
+        <ChangePasswordModal
+          notice="บัญชีนี้ใช้รหัสผ่านชั่วคราว กรุณาเปลี่ยนรหัสผ่านใหม่"
+          onClose={() => setPasswordNudge(false)}
+          onChanged={refresh}
+        />
       )}
       {helpOpen && (
         <Modal
@@ -347,7 +386,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <p>
               สิทธิ์การใช้งานขึ้นกับบทบาทของบัญชี
               ผู้ดูข้อมูลไม่สามารถแก้ไขข้อมูลได้
-              และเมนูผู้ใช้และสิทธิ์เปิดให้เฉพาะผู้ดูแลระบบ
+              และเมนูผู้ใช้และสิทธิ์ กับประวัติการใช้งาน เปิดให้เฉพาะผู้ดูแลระบบ
             </p>
           </div>
           <div className="modal-actions">

@@ -1,14 +1,26 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { Pencil, Plus, Save, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Pencil,
+  Plus,
+  Power,
+  Save,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import { useAuth } from "@/features/admin/auth-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useToast } from "@/features/admin/toast-provider";
 import { isSuper } from "@/features/admin/permissions";
-import { roleLabels } from "@/features/admin/format";
+import { date, roleLabels } from "@/features/admin/format";
 import { usersApi } from "@/lib/api";
-import { fieldErrorsFor, formMessage } from "@/lib/api/errors";
+import { errorMessage, fieldErrorsFor, formMessage } from "@/lib/api/errors";
+import { generateTemporaryPassword } from "@/lib/password";
 import type { Role, User, UserPatchBody } from "@/lib/api/types";
 import { ErrorState, LoadingState } from "@/components/data-states";
 import { EmptyState, Modal, PageHeading, SearchField } from "@/components/ui";
@@ -46,8 +58,64 @@ const formFrom = (user: User): UserForm => ({
   password: "",
 });
 
+type UserAction = { kind: "toggle" | "delete"; target: User };
+
 function FieldError({ message }: { message?: string }) {
   return message ? <span className="form-error">{message}</span> : null;
+}
+
+function ConfirmDialog({
+  title,
+  message,
+  error,
+  confirmLabel,
+  pendingLabel,
+  pending,
+  danger,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  message: string;
+  error: string;
+  confirmLabel: string;
+  pendingLabel: string;
+  pending: boolean;
+  danger: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  // Runs after Modal's effect has opened the <dialog>, so the focus call lands on a visible element.
+  useEffect(() => {
+    const timer = setTimeout(() => cancelRef.current?.focus());
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <Modal title={title} onClose={onClose}>
+      <div className="modal-body">
+        <p>{message}</p>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+      <div className="modal-actions">
+        <button className="button" type="button" ref={cancelRef} onClick={onClose}>
+          ยกเลิก
+        </button>
+        <button
+          className={`button ${danger ? "danger" : "primary"}`}
+          type="button"
+          disabled={pending}
+          onClick={onConfirm}
+        >
+          {pending ? pendingLabel : confirmLabel}
+        </button>
+      </div>
+    </Modal>
+  );
 }
 
 export default function UsersPage() {
@@ -60,16 +128,21 @@ export default function UsersPage() {
       />
     );
   }
-  return <Users />;
+  return <Users selfId={user.id} />;
 }
 
-function Users() {
+function Users({ selfId }: { selfId: string }) {
   const notify = useToast();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<UserForm | null>(null);
+  const [original, setOriginal] = useState<User | null>(null);
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [action, setAction] = useState<UserAction | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [actionPending, setActionPending] = useState(false);
   const { data, error: loadError, loading, reload } = useAsync(
     (signal) => usersApi.listUsers(signal),
     [],
@@ -79,10 +152,29 @@ function Users() {
     `${u.name} ${u.email}`.toLowerCase().includes(needle),
   );
 
-  function open(next: UserForm) {
+  function open(next: UserForm, source: User | null) {
     setError("");
     setFields({});
+    setShowPassword(false);
+    setOriginal(source);
     setEditing(next);
+  }
+
+  function openAction(next: UserAction) {
+    setActionError("");
+    setAction(next);
+  }
+
+  async function copyPassword() {
+    if (!editing?.password) return;
+    try {
+      await navigator.clipboard.writeText(editing.password);
+      notify("คัดลอกรหัสผ่านแล้ว");
+    } catch {
+      // Clipboard can be blocked; the visible field is the fallback.
+      setShowPassword(true);
+      notify("คัดลอกไม่สำเร็จ กรุณาคัดลอกจากช่องรหัสผ่าน");
+    }
   }
 
   async function save(e: FormEvent<HTMLFormElement>) {
@@ -98,6 +190,8 @@ function Users() {
           role: editing.role,
           active: editing.active,
         };
+        const email = editing.email.trim().toLowerCase();
+        if (email !== original?.email) body.email = email;
         if (editing.password) body.password = editing.password;
         await usersApi.updateUser(editing.id, body);
       } else {
@@ -119,16 +213,41 @@ function Users() {
     }
   }
 
+  async function confirmAction() {
+    if (!action) return;
+    setActionPending(true);
+    setActionError("");
+    try {
+      if (action.kind === "delete") {
+        await usersApi.deleteUser(action.target.id);
+        notify("ลบผู้ใช้แล้ว");
+      } else {
+        await usersApi.updateUser(action.target.id, {
+          active: !action.target.active,
+        });
+        notify(action.target.active ? "ปิดใช้งานผู้ใช้แล้ว" : "เปิดใช้งานผู้ใช้แล้ว");
+      }
+      setAction(null);
+      reload();
+    } catch (failure) {
+      setActionError(errorMessage(failure));
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  const editingSelf = Boolean(editing?.id && editing.id === selfId);
+
   return (
     <>
       <PageHeading
         title="ผู้ใช้และสิทธิ์"
         scope="global"
-        description="กำหนดบทบาทของทีมที่เข้ามาจัดการงานวิ่ง"
+        description="กำหนดบทบาทของทีมที่เข้ามาจัดการงานวิ่ง ระบบไม่ส่งอีเมลเชิญ กรุณาแจ้งรหัสผ่านชั่วคราวให้ผู้ใช้โดยตรง"
         action={
-          <button className="button primary" onClick={() => open(blankForm)}>
+          <button className="button primary" onClick={() => open(blankForm, null)}>
             <Plus size={17} aria-hidden="true" />
-            เพิ่มผู้ใช้
+            เชิญผู้ใช้ใหม่
           </button>
         }
       />
@@ -153,39 +272,75 @@ function Users() {
                     <th>อีเมล</th>
                     <th>บทบาท</th>
                     <th>สถานะ</th>
+                    <th>เข้าสู่ระบบล่าสุด</th>
                     <th>จัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((u) => (
-                    <tr key={u.id}>
-                      <td>
-                        <div className="person-cell">
-                          <span className="avatar">{u.name.slice(0, 1)}</span>
-                          <strong>{u.name}</strong>
-                        </div>
-                      </td>
-                      <td>{u.email}</td>
-                      <td>{roleLabels[u.role]}</td>
-                      <td>
-                        <span
-                          className={`badge ${u.active ? "badge-paid" : "badge-closed"}`}
-                        >
-                          <span aria-hidden="true" />
-                          {u.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="button small-button"
-                          onClick={() => open(formFrom(u))}
-                        >
-                          <Pencil size={14} aria-hidden="true" />
-                          แก้ไข
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtered.map((u) => {
+                    const isSelf = u.id === selfId;
+                    const hintId = `self-hint-${u.id}`;
+                    return (
+                      <tr key={u.id}>
+                        <td>
+                          <div className="person-cell">
+                            <span className="avatar">{u.name.slice(0, 1)}</span>
+                            <strong>{u.name}</strong>
+                          </div>
+                        </td>
+                        <td>{u.email}</td>
+                        <td>{roleLabels[u.role]}</td>
+                        <td>
+                          <span
+                            className={`badge ${u.active ? "badge-paid" : "badge-closed"}`}
+                          >
+                            <span aria-hidden="true" />
+                            {u.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                          </span>
+                          {u.mustChangePassword && (
+                            <small className="cell-sub">ต้องเปลี่ยนรหัสผ่าน</small>
+                          )}
+                        </td>
+                        <td className="muted">
+                          {u.lastLoginAt ? date(u.lastLoginAt, true) : "–"}
+                        </td>
+                        <td>
+                          <div className="row-actions">
+                            <button
+                              className="button small-button"
+                              onClick={() => open(formFrom(u), u)}
+                            >
+                              <Pencil size={14} aria-hidden="true" />
+                              แก้ไข
+                            </button>
+                            <button
+                              className="button small-button"
+                              disabled={isSelf}
+                              aria-describedby={isSelf ? hintId : undefined}
+                              onClick={() => openAction({ kind: "toggle", target: u })}
+                            >
+                              <Power size={14} aria-hidden="true" />
+                              {u.active ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+                            </button>
+                            {!u.active && !isSelf && (
+                              <button
+                                className="button small-button danger"
+                                onClick={() => openAction({ kind: "delete", target: u })}
+                              >
+                                <Trash2 size={14} aria-hidden="true" />
+                                ลบถาวร
+                              </button>
+                            )}
+                          </div>
+                          {isSelf && (
+                            <small className="cell-sub" id={hintId}>
+                              ไม่สามารถปิดใช้งานบัญชีของตัวเองได้
+                            </small>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -210,7 +365,7 @@ function Users() {
       </div>
       {editing && (
         <Modal
-          title={editing.id ? "แก้ไขผู้ใช้" : "เพิ่มผู้ใช้"}
+          title={editing.id ? "แก้ไขผู้ใช้" : "เชิญผู้ใช้ใหม่"}
           onClose={() => setEditing(null)}
         >
           <form onSubmit={save}>
@@ -238,20 +393,18 @@ function Users() {
                   required
                   type="email"
                   maxLength={EMAIL_MAX}
-                  readOnly={Boolean(editing.id)}
                   value={editing.email}
                   aria-invalid={Boolean(fields.email)}
                   onChange={(e) => setEditing({ ...editing, email: e.target.value })}
                 />
-                {editing.id && <small>ไม่สามารถแก้ไขอีเมลได้</small>}
                 <FieldError message={fields.email} />
               </label>
               <label className="full">
                 {editing.id
                   ? `รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน, อย่างน้อย ${MIN_PASSWORD} ตัวอักษร)`
-                  : `รหัสผ่าน (อย่างน้อย ${MIN_PASSWORD} ตัวอักษร)`}
+                  : `รหัสผ่านชั่วคราว (อย่างน้อย ${MIN_PASSWORD} ตัวอักษร)`}
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required={!editing.id}
                   minLength={MIN_PASSWORD}
@@ -262,10 +415,49 @@ function Users() {
                 />
                 <FieldError message={fields.password} />
               </label>
+              <div className="full modal-inline-actions">
+                <button
+                  className="button small-button"
+                  type="button"
+                  onClick={() => {
+                    setEditing({ ...editing, password: generateTemporaryPassword() });
+                    setShowPassword(true);
+                  }}
+                >
+                  <KeyRound size={14} aria-hidden="true" />
+                  สร้างรหัสผ่านชั่วคราว
+                </button>
+                <button
+                  className="button small-button"
+                  type="button"
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff size={14} aria-hidden="true" />
+                  ) : (
+                    <Eye size={14} aria-hidden="true" />
+                  )}
+                  {showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                </button>
+                <button
+                  className="button small-button"
+                  type="button"
+                  disabled={!editing.password}
+                  onClick={copyPassword}
+                >
+                  <Copy size={14} aria-hidden="true" />
+                  คัดลอก
+                </button>
+              </div>
+              <p className="form-hint full">
+                ผู้ใช้จะถูกแจ้งให้เปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
+              </p>
               <label>
                 บทบาท
                 <select
                   value={editing.role}
+                  disabled={editingSelf}
                   aria-invalid={Boolean(fields.role)}
                   onChange={(e) => setEditing({ ...editing, role: e.target.value as Role })}
                 >
@@ -282,6 +474,7 @@ function Users() {
                   สถานะ
                   <select
                     value={String(editing.active)}
+                    disabled={editingSelf}
                     onChange={(e) =>
                       setEditing({ ...editing, active: e.target.value === "true" })
                     }
@@ -291,6 +484,11 @@ function Users() {
                   </select>
                   <FieldError message={fields.active} />
                 </label>
+              )}
+              {editingSelf && (
+                <p className="form-hint full">
+                  ไม่สามารถเปลี่ยนบทบาทหรือสถานะของบัญชีตัวเองได้
+                </p>
               )}
             </div>
             <div className="modal-actions">
@@ -304,6 +502,37 @@ function Users() {
             </div>
           </form>
         </Modal>
+      )}
+      {action && (
+        <ConfirmDialog
+          title={
+            action.kind === "delete"
+              ? "ลบผู้ใช้ถาวร"
+              : action.target.active
+                ? "ปิดใช้งานผู้ใช้"
+                : "เปิดใช้งานผู้ใช้"
+          }
+          message={
+            action.kind === "delete"
+              ? `ลบ ${action.target.name} (${action.target.email}) ถาวร? ถ้าผู้ใช้เคยมีประวัติการใช้งานจะลบไม่ได้ ให้ปิดใช้งานไว้แทน`
+              : action.target.active
+                ? `ปิดใช้งาน ${action.target.name}? ผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`
+                : `เปิดใช้งาน ${action.target.name} อีกครั้ง?`
+          }
+          error={actionError}
+          confirmLabel={
+            action.kind === "delete"
+              ? "ลบถาวร"
+              : action.target.active
+                ? "ปิดใช้งาน"
+                : "เปิดใช้งาน"
+          }
+          pendingLabel="กำลังดำเนินการ…"
+          pending={actionPending}
+          danger={action.kind === "delete" || action.target.active}
+          onConfirm={confirmAction}
+          onClose={() => setAction(null)}
+        />
       )}
     </>
   );

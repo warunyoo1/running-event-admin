@@ -11,7 +11,6 @@ import {
 import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useToast } from "@/features/admin/toast-provider";
-import { clientCsv } from "@/features/admin/client-csv";
 import { money, number, statusLabels } from "@/features/admin/format";
 import { exportsApi, reportsApi } from "@/lib/api";
 import { errorMessage } from "@/lib/api/errors";
@@ -36,6 +35,7 @@ export default function ReportsPage() {
   const [end, setEnd] = useState("");
   const [shirtStatus, setShirtStatus] = useState<OrderStatus>("paid");
   const [exporting, setExporting] = useState(false);
+  const [exportingShirts, setExportingShirts] = useState(false);
   const invalidRange = Boolean(start && end && start > end);
   const summary = useAsync(
     (signal) =>
@@ -71,6 +71,19 @@ export default function ReportsPage() {
       notify(errorMessage(failure));
     } finally {
       setExporting(false);
+    }
+  }
+  async function downloadShirtSizes() {
+    setExportingShirts(true);
+    try {
+      await exportsApi.exportShirtSizesCsv({
+        eventId: scopeEventId,
+        status: shirtStatus,
+      });
+    } catch (failure) {
+      notify(errorMessage(failure));
+    } finally {
+      setExportingShirts(false);
     }
   }
   return (
@@ -235,16 +248,8 @@ export default function ReportsPage() {
               })}
               <button
                 className="button"
-                onClick={() =>
-                  shirts.data &&
-                  clientCsv("shirt-sizes.csv", [
-                    ["ไซซ์เสื้อ", "จำนวน"],
-                    ...SHIRT_SIZES.map((size): (string | number)[] => [
-                      size,
-                      shirts.data?.sizes.find((item) => item.size === size)?.count ?? 0,
-                    ]),
-                  ])
-                }
+                disabled={exportingShirts}
+                onClick={downloadShirtSizes}
               >
                 <Download size={15} aria-hidden="true" />
                 ส่งออกจำนวนเสื้อ

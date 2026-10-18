@@ -1,5 +1,5 @@
 import { get, getPage, mutate } from "../client";
-import type { AdminOrderRow, OrderDetail, OrderStatus, PageQuery, TrackingBody } from "../types";
+import type { AddressBody, AdminOrderRow, OrderDetail, OrderStatus, PageQuery, TrackingBody } from "../types";
 
 export type OrderFilters = PageQuery & {
   eventId?: string;
@@ -21,3 +21,9 @@ export const rejectOrder = (id: string, reason: string) =>
   mutate<OrderDetail>("POST", `/orders/${id}/reject`, { reason });
 export const setTracking = (id: string, body: TrackingBody) =>
   mutate<OrderDetail>("PATCH", `/orders/${id}/tracking`, body);
+export const addNote = (id: string, text: string) =>
+  mutate<OrderDetail>("POST", `/orders/${id}/notes`, { text });
+export const deleteNote = (id: string, noteId: string) =>
+  mutate<OrderDetail>("DELETE", `/orders/${id}/notes/${noteId}`);
+export const updateAddress = (id: string, body: AddressBody) =>
+  mutate<OrderDetail>("PATCH", `/orders/${id}/address`, body);

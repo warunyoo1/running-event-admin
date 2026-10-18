@@ -1,3 +1,4 @@
+export * as auditLogsApi from "./endpoints/audit-logs";
 export * as authApi from "./endpoints/auth";
 export * as dashboardApi from "./endpoints/dashboard";
 export * as eventImagesApi from "./endpoints/event-images";
@@ -12,3 +13,4 @@ export * as usersApi from "./endpoints/users";
 export * from "./client";
 export * from "./errors";
 export * from "./types";
+

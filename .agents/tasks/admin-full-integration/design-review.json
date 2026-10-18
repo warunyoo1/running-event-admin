@@ -1,0 +1,15 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    { "id": 1, "severity": "HIGH", "title": "Unsetting category/theme removes keys from existing JSON (schema defaults road/orange); violates additive contract. Emit defaults in event view or $set defaults." },
+    { "id": 2, "severity": "HIGH", "title": "Dashboard archived-race filter changes existing participants/races values and is unrequested scope; drop it or keep participants unfiltered." },
+    { "id": 3, "severity": "MEDIUM", "title": "Shipping search >5000 fallback aggregate pipeline is unspecified ('...'); give exact pipeline and Mongo version for $regexMatch." },
+    { "id": 4, "severity": "MEDIUM", "title": "Timeline paid entry uses order transactionRef which does not exist; source from the approved Payment." },
+    { "id": 5, "severity": "MEDIUM", "title": "address_updated timeline detail undefined; address PII could leak to viewers via detail." },
+    { "id": 6, "severity": "NIT", "title": "Section 11 corrupted text and D17-D19 ordering." },
+    { "id": 7, "severity": "NIT", "title": "Admin paths omit src/ root." },
+    { "id": 8, "severity": "NIT", "title": "mustChangePassword nudge 'once per session' has no storage mechanism." },
+    { "id": 9, "severity": "NIT", "title": "EMAIL_TAKEN display has two alternative instructions; pick form-level alert." }
+  ],
+  "reviewDoc": "c:\\Project\\running-event-admin\\.agents\\tasks\\admin-full-integration/design-review.md"
+}

@@ -10,6 +10,9 @@ import { date, formatAddress, money } from "./format";
 import { ordersApi, slipsApi } from "@/lib/api";
 import { fieldErrorsFor, formMessage } from "@/lib/api/errors";
 import type { OrderDetail as OrderDetailData } from "@/lib/api/types";
+import { OrderAddressForm } from "./order-address-form";
+import { OrderNotes } from "./order-notes";
+import { OrderTimeline } from "./order-timeline";
 import { ErrorState, LoadingState } from "@/components/data-states";
 import { Badge, Modal } from "@/components/ui";
 
@@ -65,6 +68,7 @@ export function OrderDetail({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
   const writable = canWrite(user.role);
 
   async function run(
@@ -187,7 +191,18 @@ export function OrderDetail({
               {order.address && (
                 <div>
                   <dt>ที่อยู่จัดส่ง</dt>
-                  <dd>{formatAddress(order.address)}</dd>
+                  <dd>
+                    {formatAddress(order.address)}
+                    {order.canEditAddress && writable && !editingAddress && (
+                      <button
+                        type="button"
+                        className="button small-button address-edit-button"
+                        onClick={() => setEditingAddress(true)}
+                      >
+                        แก้ไขที่อยู่
+                      </button>
+                    )}
+                  </dd>
                 </div>
               )}
               {order.trackingNo && (
@@ -209,7 +224,7 @@ export function OrderDetail({
                 <div>
                   <dt>ตรวจสอบโดย</dt>
                   <dd>
-                    {order.reviewedBy}
+                    {order.reviewedByName ?? order.reviewedBy}
                     <small>{date(order.reviewedAt, true)}</small>
                   </dd>
                 </div>
@@ -227,6 +242,17 @@ export function OrderDetail({
                 </div>
               )}
             </dl>
+            {editingAddress && order.canEditAddress && order.address && (
+              <OrderAddressForm
+                orderId={order.id}
+                initial={order.address}
+                onSaved={() => {
+                  reload();
+                  onChanged?.();
+                }}
+                onClose={() => setEditingAddress(false)}
+              />
+            )}
             <div className="detail-participants">
               <h3>ผู้สมัคร {order.participants.length} คน</h3>
               {order.participants.map((p) => (
@@ -295,6 +321,8 @@ export function OrderDetail({
             )}
           </label>
         )}
+        <OrderNotes orderId={order.id} notes={order.notes} onChanged={reload} />
+        <OrderTimeline entries={order.timeline} />
       </div>
       <div className="modal-actions">
         {mode === "rejecting" ? (

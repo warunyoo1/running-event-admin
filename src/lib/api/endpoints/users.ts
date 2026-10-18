@@ -5,3 +5,4 @@ export const listUsers = (signal?: AbortSignal) => get<User[]>("/users", undefin
 export const createUser = (body: UserCreateBody) => mutate<User>("POST", "/users", body);
 export const updateUser = (id: string, body: UserPatchBody) =>
   mutate<User>("PATCH", `/users/${id}`, body);
+export const deleteUser = (id: string) => mutate<null>("DELETE", `/users/${id}`);

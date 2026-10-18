@@ -1,0 +1,7 @@
+﻿{
+  "task_id": "task-admin-full-integration",
+  "task_description": "Connect the admin end to end across two repos (API c:/Project/running-event-api, admin c:/Project/running-event-admin): event delete/archive/restore and explicit-null clears; user deactivate/safe delete/temp-password create/email edit; order notes, timeline, address edit and reviewer name; super_admin audit log page; server-side shipping search; server overview and shirt-size CSV; sweep for any other dead/fake control. No control may stay dead or client-only. Binding amendments in plan.md override design.md.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}

@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import {
+  Archive,
+  ArchiveRestore,
   CalendarDays,
   MapPin,
   Plus,
@@ -32,8 +34,14 @@ import {
   themeLabels,
 } from "@/features/admin/format";
 import { eventsApi } from "@/lib/api";
-import { fieldErrorsFor, formMessage } from "@/lib/api/errors";
-import { EVENT_CATEGORIES, EVENT_THEMES, PAGE_SIZE } from "@/lib/constants";
+import { errorMessage, fieldErrorsFor, formMessage } from "@/lib/api/errors";
+import {
+  DEFAULT_EVENT_CATEGORY,
+  DEFAULT_EVENT_THEME,
+  EVENT_CATEGORIES,
+  EVENT_THEMES,
+  PAGE_SIZE,
+} from "@/lib/constants";
 import {
   SLUG_MAX,
   SLUG_PATTERN,
@@ -67,9 +75,12 @@ const ORGANIZER_MAX = 200;
 const REFUND_MAX = 2000;
 const RACE_NAME_MAX = 50;
 const MAX_RACES = 10;
+const EVENT_HAS_ORDERS_CODE = "EVENT_HAS_ORDERS";
 
 type RaceForm = EventForm["races"][number];
 type Editing = { id: string | null; original: AdminEvent | null; form: EventForm };
+/** `hasOrders` is set once the API refused a hard delete with EVENT_HAS_ORDERS. */
+type Confirm = { kind: "archive" | "delete"; event: AdminEvent; hasOrders: boolean };
 
 const emptyRace = (): RaceForm => ({ name: "", price: "0", quota: "100", start: "" });
 
@@ -125,6 +136,76 @@ function editingFrom(event: AdminEvent): Editing {
   };
 }
 
+/** Confirm dialog for destructive actions: danger button, focus starts on the cancel button. */
+function ConfirmDialog({
+  title,
+  message,
+  error,
+  confirmLabel,
+  pendingLabel,
+  pending,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  message: string;
+  error: string;
+  /** Omitted when there is nothing left to confirm (only the close button is shown). */
+  confirmLabel?: string;
+  pendingLabel: string;
+  pending: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  // Runs after Modal's effect has opened the <dialog>, so the focus call lands on a visible element.
+  useEffect(() => {
+    const timer = setTimeout(() => cancelRef.current?.focus());
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <Modal title={title} onClose={onClose}>
+      <div className="modal-body">
+        <p>{message}</p>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+      <div className="modal-actions">
+        <button className="button" type="button" ref={cancelRef} onClick={onClose}>
+          {confirmLabel ? "ยกเลิก" : "ปิด"}
+        </button>
+        {confirmLabel && (
+          <button
+            className="button danger"
+            type="button"
+            disabled={pending}
+            onClick={onConfirm}
+          >
+            {pending ? pendingLabel : confirmLabel}
+          </button>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function confirmMessage({ kind, event, hasOrders }: Confirm): string {
+  if (kind === "archive")
+    return `เก็บถาวรงาน «${event.name}»? งานจะถูกซ่อนจากหน้าเว็บสาธิตสมัครและรายการหลัก สามารถกู้คืนได้ภายหลัง`;
+  if (hasOrders) return "งานนี้มีออเดอร์แล้ว ลบถาวรไม่ได้";
+  return `ลบงาน «${event.name}» ถาวร? ระยะวิ่งและรูปภาพจะถูกลบ ไม่สามารถกู้คืนได้ ลบได้เฉพาะงานที่ไม่มีออเดอร์`;
+}
+
+/** `undefined` leaves only the close button (an archived event with orders has nothing to offer). */
+function confirmLabel({ kind, event, hasOrders }: Confirm): string | undefined {
+  if (kind === "archive") return "เก็บถาวร";
+  if (!hasOrders) return "ลบถาวร";
+  return event.archived ? undefined : "เก็บถาวรแทน";
+}
+
 function FieldError({ message, id }: { message?: string; id?: string }) {
   return message ? (
     <span className="form-error" id={id}>
@@ -149,7 +230,11 @@ function Events() {
   const canEdit = isSuper(user.role);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<EventStatus | "">("");
+  const [archived, setArchived] = useState(false);
   const [page, setPage] = useState(1);
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [confirmError, setConfirmError] = useState("");
+  const [confirmPending, setConfirmPending] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [viewing, setViewing] = useState<AdminEvent | null>(null);
   const [error, setError] = useState("");
@@ -164,8 +249,9 @@ function Events() {
   const deepLinked = useRef(false);
   const q = useDebounced(query.trim());
   const { data, error: loadError, loading, reload } = useAsync(
-    (signal) => eventsApi.listEvents({ q, status, page, pageSize: PAGE_SIZE }, signal),
-    [q, status, page],
+    (signal) =>
+      eventsApi.listEvents({ q, status, archived, page, pageSize: PAGE_SIZE }, signal),
+    [q, status, archived, page],
   );
   const rows = data?.data ?? [];
 
@@ -225,6 +311,57 @@ function Events() {
     setForm({
       races: editing.form.races.map((race, i) => (i === index ? { ...race, ...patch } : race)),
     });
+  }
+
+  function ask(kind: Confirm["kind"], event: AdminEvent) {
+    setConfirmError("");
+    setConfirm({ kind, event, hasOrders: false });
+  }
+  function closeConfirm() {
+    if (!confirmPending) setConfirm(null);
+  }
+  function afterChange() {
+    reload();
+    reloadEvents();
+  }
+  async function restore(event: AdminEvent) {
+    try {
+      await eventsApi.restoreEvent(event.id);
+      notify(`กู้คืนงาน «${event.name}» แล้ว`);
+      afterChange();
+    } catch (failure) {
+      notify(errorMessage(failure));
+    }
+  }
+  async function runConfirm() {
+    if (!confirm) return;
+    const { kind, event, hasOrders } = confirm;
+    setConfirmPending(true);
+    setConfirmError("");
+    try {
+      if (kind === "delete" && !hasOrders) {
+        await eventsApi.deleteEvent(event.id);
+        notify(`ลบงาน «${event.name}» แล้ว`);
+      } else {
+        // Archive, or "archive instead" after a refused delete.
+        await eventsApi.archiveEvent(event.id);
+        notify(`เก็บถาวรงาน «${event.name}» แล้ว`);
+      }
+      setConfirm(null);
+      afterChange();
+    } catch (failure) {
+      if (
+        kind === "delete" &&
+        failure instanceof ApiError &&
+        failure.code === EVENT_HAS_ORDERS_CODE
+      ) {
+        setConfirm({ kind, event, hasOrders: true });
+      } else {
+        setConfirmError(errorMessage(failure));
+      }
+    } finally {
+      setConfirmPending(false);
+    }
   }
 
   async function save(e: FormEvent<HTMLFormElement>) {
@@ -311,6 +448,16 @@ function Events() {
             ))}
           </select>
         </label>
+        <label>
+          <span className="sr-only">การแสดงผล</span>
+          <select
+            value={archived ? "archived" : "active"}
+            onChange={(e) => changeFilter(() => setArchived(e.target.value === "archived"))}
+          >
+            <option value="active">ใช้งานอยู่</option>
+            <option value="archived">เก็บถาวร</option>
+          </select>
+        </label>
         <span className="result-count">{data ? `${data.meta.total} งานวิ่ง` : ""}</span>
       </div>
       {loadError && <ErrorState message={loadError} onRetry={reload} />}
@@ -329,6 +476,12 @@ function Events() {
                     <div className="event-card-body">
                       <div className="event-card-meta">
                         <Badge status={event.status} />
+                        {event.archived && (
+                          <span className="badge badge-closed">
+                            <span aria-hidden="true" />
+                            เก็บถาวร
+                          </span>
+                        )}
                         <span>{event.races.map((race) => race.name).join(" / ")}</span>
                       </div>
                       <h2>{event.name}</h2>
@@ -363,7 +516,7 @@ function Events() {
                           <button className="text-link" onClick={() => setViewing(event)}>
                             ดูรูปภาพ
                           </button>
-                          {canEdit && (
+                          {canEdit && !event.archived && (
                             <button className="text-link" onClick={() => open(editingFrom(event))}>
                               จัดการงาน
                               <ArrowUpRight size={16} aria-hidden="true" />
@@ -371,6 +524,34 @@ function Events() {
                           )}
                         </div>
                       </div>
+                      {canEdit && (
+                        <div className="event-card-actions">
+                          {event.archived ? (
+                            <button
+                              className="button small-button"
+                              onClick={() => restore(event)}
+                            >
+                              <ArchiveRestore size={15} aria-hidden="true" />
+                              กู้คืน
+                            </button>
+                          ) : (
+                            <button
+                              className="button small-button"
+                              onClick={() => ask("archive", event)}
+                            >
+                              <Archive size={15} aria-hidden="true" />
+                              เก็บถาวร
+                            </button>
+                          )}
+                          <button
+                            className="button small-button danger-outline"
+                            onClick={() => ask("delete", event)}
+                          >
+                            <Trash2 size={15} aria-hidden="true" />
+                            ลบ
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </article>
                 );
@@ -381,6 +562,18 @@ function Events() {
         ) : (
           <EmptyState title="ไม่พบงานวิ่ง" />
         ))}
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.kind === "archive" ? "เก็บถาวรงานวิ่ง" : "ลบงานวิ่งถาวร"}
+          message={confirmMessage(confirm)}
+          error={confirmError}
+          confirmLabel={confirmLabel(confirm)}
+          pendingLabel="กำลังดำเนินการ…"
+          pending={confirmPending}
+          onConfirm={runConfirm}
+          onClose={closeConfirm}
+        />
+      )}
       {viewing && (
         <Modal title={`รูปภาพ: ${viewing.name}`} onClose={() => setViewing(null)}>
           <EventImagesPanel event={viewing} />
@@ -485,18 +678,27 @@ function Events() {
                 />
                 <FieldError message={fields.date} />
               </label>
-              <label>
-                ปิดรับสมัคร
-                <input
-                  type="date"
-                  required={Boolean(original?.registrationEnds)}
-                  value={form.registrationEnds}
-                  aria-invalid={Boolean(fields.registrationEnds)}
-                  onChange={(e) => setForm({ registrationEnds: e.target.value })}
-                />
-                {original?.registrationEnds && <small>ตั้งค่าแล้วไม่สามารถล้างได้</small>}
-                <FieldError message={fields.registrationEnds} />
-              </label>
+              <div className="field-clearable">
+                <label>
+                  ปิดรับสมัคร
+                  <input
+                    type="date"
+                    value={form.registrationEnds}
+                    aria-invalid={Boolean(fields.registrationEnds)}
+                    onChange={(e) => setForm({ registrationEnds: e.target.value })}
+                  />
+                  <FieldError message={fields.registrationEnds} />
+                </label>
+                {form.registrationEnds && (
+                  <button
+                    type="button"
+                    className="text-link"
+                    onClick={() => setForm({ registrationEnds: "" })}
+                  >
+                    ล้างวันที่
+                  </button>
+                )}
+              </div>
               <label>
                 สถานะ
                 <select
@@ -521,16 +723,13 @@ function Events() {
                     setForm({ category: e.target.value as EventForm["category"] })
                   }
                 >
-                  <option value="" disabled={Boolean(original?.category)}>
-                    ไม่ระบุ
-                  </option>
+                  <option value="">ใช้ค่าเริ่มต้น ({categoryLabels[DEFAULT_EVENT_CATEGORY]})</option>
                   {EVENT_CATEGORIES.map((value) => (
                     <option value={value} key={value}>
                       {categoryLabels[value]}
                     </option>
                   ))}
                 </select>
-                {original?.category && <small>ตั้งค่าแล้วไม่สามารถล้างได้</small>}
                 <FieldError message={fields.category} />
               </label>
               <label>
@@ -540,16 +739,13 @@ function Events() {
                   aria-invalid={Boolean(fields.theme)}
                   onChange={(e) => setForm({ theme: e.target.value as EventForm["theme"] })}
                 >
-                  <option value="" disabled={Boolean(original?.theme)}>
-                    ไม่ระบุ
-                  </option>
+                  <option value="">ใช้ค่าเริ่มต้น ({themeLabels[DEFAULT_EVENT_THEME]})</option>
                   {EVENT_THEMES.map((value) => (
                     <option value={value} key={value}>
                       {themeLabels[value]}
                     </option>
                   ))}
                 </select>
-                {original?.theme && <small>ตั้งค่าแล้วไม่สามารถล้างได้</small>}
                 <FieldError message={fields.theme} />
               </label>
               <label className="full">
@@ -603,7 +799,6 @@ function Events() {
                 )}
                 <FieldError message={fields.races} />
                 {form.races.map((race, index) => {
-                  const originalStart = original?.races.find((r) => r.id === race.id)?.start;
                   return (
                     <div className="race-field-row" key={race.id ?? `new-${index}`}>
                       <label>
@@ -643,17 +838,27 @@ function Events() {
                         />
                         <FieldError message={fields[`races.${index}.quota`]} />
                       </label>
-                      <label>
-                        เวลาปล่อยตัว
-                        <input
-                          type="time"
-                          required={Boolean(originalStart)}
-                          value={race.start}
-                          aria-invalid={Boolean(fields[`races.${index}.start`])}
-                          onChange={(e) => setRace(index, { start: e.target.value })}
-                        />
-                        <FieldError message={fields[`races.${index}.start`]} />
-                      </label>
+                      <div className="field-clearable">
+                        <label>
+                          เวลาปล่อยตัว
+                          <input
+                            type="time"
+                            value={race.start}
+                            aria-invalid={Boolean(fields[`races.${index}.start`])}
+                            onChange={(e) => setRace(index, { start: e.target.value })}
+                          />
+                          <FieldError message={fields[`races.${index}.start`]} />
+                        </label>
+                        {race.start && (
+                          <button
+                            type="button"
+                            className="text-link"
+                            onClick={() => setRace(index, { start: "" })}
+                          >
+                            ล้างเวลา
+                          </button>
+                        )}
+                      </div>
                       {!race.id && form.races.length > 1 && (
                         <button
                           type="button"

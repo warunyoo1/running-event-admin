@@ -18,6 +18,8 @@ import { EmptyState } from "@/components/ui";
 type AuthContext = {
   user: User;
   logout: () => Promise<void>;
+  /** Reload the signed-in user without showing the loader (e.g. after a password change). */
+  refresh: () => Promise<void>;
 };
 const Context = createContext<AuthContext | null>(null);
 
@@ -61,6 +63,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.replace("/login");
   }, [router]);
 
+  const refresh = useCallback(async () => {
+    try {
+      setUser(await authApi.me());
+    } catch {
+      // Keep the current user; a 401 is handled by the unauthorized handler.
+    }
+  }, []);
+
   if (error)
     return (
       <main className="context-loading">
@@ -76,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         กำลังโหลดพื้นที่ทำงาน…
       </p>
     );
-  return <Context.Provider value={{ user, logout }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ user, logout, refresh }}>{children}</Context.Provider>;
 }
 
 export function useAuth() {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -16,10 +17,11 @@ import {
 } from "lucide-react";
 import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
-import { clientCsv } from "@/features/admin/client-csv";
+import { useToast } from "@/features/admin/toast-provider";
 import { date, money, number } from "@/features/admin/format";
-import { dashboardApi, ordersApi } from "@/lib/api";
-import type { DashboardData, OrderStatus } from "@/lib/api/types";
+import { dashboardApi, exportsApi, ordersApi } from "@/lib/api";
+import { errorMessage } from "@/lib/api/errors";
+import type { OrderStatus } from "@/lib/api/types";
 import { ErrorState, LoadingState } from "@/components/data-states";
 import {
   Badge,
@@ -39,21 +41,20 @@ const STATUS_ORDER: OrderStatus[] = [
   "cancelled",
 ];
 
-function exportOverview(data: DashboardData) {
-  clientCsv("overview.csv", [
-    ["รายการ", "จำนวน"],
-    ["ที่นั่งที่จอง", data.participants],
-    ["ยอดชำระแล้ว", data.paidRevenue],
-    ["สลิปรอตรวจ", data.pendingReview],
-    ...data.races.map((race): (string | number)[] => [
-      `${race.eventName} · ${race.name} (จอง/โควตา)`,
-      `${race.reserved}/${race.quota}`,
-    ]),
-  ]);
-}
-
 export default function DashboardPage() {
   const { events, eventId, scopeEventId } = useScope();
+  const notify = useToast();
+  const [exporting, setExporting] = useState(false);
+  async function exportOverview() {
+    setExporting(true);
+    try {
+      await exportsApi.exportOverviewCsv({ eventId: scopeEventId });
+    } catch (failure) {
+      notify(errorMessage(failure));
+    } finally {
+      setExporting(false);
+    }
+  }
   const summary = useAsync(
     (signal) => dashboardApi.getDashboard(scopeEventId, signal),
     [scopeEventId],
@@ -79,8 +80,8 @@ export default function DashboardPage() {
         action={
           <button
             className="button"
-            disabled={!data}
-            onClick={() => data && exportOverview(data)}
+            disabled={!data || exporting}
+            onClick={exportOverview}
           >
             <Download size={16} aria-hidden="true" />
             ส่งออกรายงาน

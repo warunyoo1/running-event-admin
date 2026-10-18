@@ -1566,6 +1566,16 @@ input[type="checkbox"] {
   padding: 11px 14px;
   border-radius: 6px;
 }
+.field-clearable {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.field-clearable > label {
+  align-self: stretch;
+}
 .race-fields {
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -2839,4 +2849,147 @@ input[type="checkbox"] {
 }
 .bib-edit input {
   width: 110px;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.modal-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form-hint {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted, #6b7280);
+}
+
+/* Order detail: address edit, internal notes, timeline */
+.address-edit-button {
+  display: block;
+  margin-top: 8px;
+}
+.order-address-form {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+}
+.order-address-form h3 {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.order-address-form .form-error {
+  margin-top: 12px;
+}
+.order-address-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+.order-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.order-section h3 {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.order-section > .form-error {
+  margin-top: 12px;
+}
+.order-notes {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.order-notes li {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  font-size: 13px;
+}
+.order-notes .note-text {
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.order-notes small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.note-form label {
+  font-weight: 500;
+}
+.note-form textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+}
+.order-timeline {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.order-timeline li {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+.order-timeline .timeline-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.order-timeline .timeline-paid .timeline-icon {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.order-timeline .timeline-slip_rejected .timeline-icon,
+.order-timeline .timeline-cancelled .timeline-icon,
+.order-timeline .timeline-expired .timeline-icon {
+  background: #fff1f1;
+  color: var(--danger);
+}
+.order-timeline small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.order-timeline p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

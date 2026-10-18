@@ -33,8 +33,8 @@ HTTP warning: with plain HTTP, credentials travel in clear text between Next and
 `super_admin`, `reviewer`, `viewer`. The UI hides actions as a convenience; the API is the authority.
 
 - `viewer`: read and export only.
-- `reviewer`: also cancel, approve, reject, tracking, BIB and collected updates.
-- `super_admin`: also create/edit events, manage event images and manage users.
+- `reviewer`: also cancel, approve, reject, tracking, address edit, internal notes (delete only their own), BIB and collected updates.
+- `super_admin`: also create/edit/archive/delete events, manage event images, manage users and read the audit log.
 
 ## Event images
 
@@ -54,11 +54,12 @@ The events dialog ("ตั้งค่างานวิ่ง") has a "รู�
 
 ```
 src/proxy.ts                  optimistic guard: no rr_admin_token cookie -> /login?next=...
-src/app/(admin)/*/page.tsx    client pages (dashboard, events, orders, slips, participants, shipping, reports, users)
+src/app/(admin)/*/page.tsx    client pages (dashboard, events, orders, slips, participants, shipping, reports, users, audit-logs)
 src/app/login/page.tsx        server page, renders components/login-form.tsx
 src/components/               shell, shared UI, data states, login and change-password
-src/features/admin/           providers (auth, scope, toast), use-async, permissions, format, client-csv, order-detail, event-images
+src/features/admin/           providers (auth, scope, toast), use-async, permissions, format, order-detail (+ notes, timeline, address form), event-images
 src/lib/constants.ts          API_BASE, cookie name, page size, export limit, labels
+src/lib/password.ts           temporary password generator (crypto.getRandomValues)
 src/lib/safe-next.ts          open-redirect-safe `next` handling
 src/lib/api/                  types, errors, query, client, endpoints/*
 ```
@@ -73,14 +74,18 @@ Authoritative session check is `AuthProvider` (`GET /auth/me`). A 401 redirects 
 4. Map `ApiError` with `fieldErrorsFor` and `formMessage`. Disable submit buttons while pending.
 5. Add a nav entry in `components/admin-shell.tsx` if it is a new route.
 
-## Gaps
-
-UI with no API endpoint (kept, not invented):
-- Overview CSV and shirt-size CSV are generated in the browser from loaded data.
-- Shipping search only filters the loaded page.
-- Event delete/archive, user delete/invite, user email edit.
-- Order notes/timeline, address editing, audit log view.
-- Event `registrationEnds`, `category`, `theme` and race `start` cannot be cleared once set. `PUT /events/:id` sets only the provided fields, so omitting them keeps the old value.
-
+## Backed by the API
+Everything in the UI calls a real endpoint. Nothing is generated in the browser any more:
+- Overview and shirt-size CSV: `GET /export/overview.csv`, `GET /export/shirt-sizes.csv` (`client-csv.ts` is gone).
+- Shipping search: `GET /shipping?q=` searches every page (participant name, BIB, order no, contact name/phone, tracking no) and the fulfillment CSV honors it. Needs MongoDB 5.0+ on the API side.
+- Events: archive, restore and permanent delete (super_admin), clearing `registrationEnds`, `category`, `theme` and race `start`.
+- Users: invite with a generated temporary password, email edit, deactivate/activate, permanent delete, last login, forced password-change nudge.
+- Orders: internal notes, timeline, address editing, reviewer name.
+- Audit log page (super_admin): `GET /audit-logs`.
+Remaining limits (on purpose):
+- The dashboard is unchanged: after an event is archived its races still appear in the dashboard and overview CSV, and its orders are still counted.
+- The race filter on the participants page is built from the active events in the scope list, so races of archived events cannot be picked there (their participants still show when no race is chosen).
+- Category and theme cannot be "unset": clearing them stores the API defaults (`road`, `orange`).
+- The API sends no invitation email. Share the temporary password with the user yourself.
 API endpoints with no admin UI:
 - All `/public/*` routes (public site), `/health`, and `GET /events/:id` (list data is enough).
