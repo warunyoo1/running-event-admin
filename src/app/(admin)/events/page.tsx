@@ -7,6 +7,7 @@ import {
   ArchiveRestore,
   CalendarDays,
   MapPin,
+  Flag,
   Plus,
   ArrowUpRight,
   Trash2,
@@ -568,8 +569,12 @@ function Events() {
                       </p>
                       <p>
                         <MapPin size={16} aria-hidden="true" />
-                        {event.venue}
+                        <span>ชื่อสถานที่: {event.venue}</span>
                       </p>
+                      {event.startPoint?.trim() && <p>
+                        <Flag size={16} aria-hidden="true" />
+                        <span>จุดปล่อยตัว: {event.startPoint}</span>
+                      </p>}
                       <div className="quota">
                         <div>
                           <span>
@@ -673,7 +678,7 @@ function Events() {
             <nav className="event-editor-steps" aria-label="หมวดข้อมูลงานวิ่ง">
               {editorSteps.map((label, index) => (
                 <button key={label} type="button" aria-current={editorStep === index ? "step" : undefined} disabled={pending} onClick={() => navigateEditor(index)}>
-                  <span className="event-step-number">{index + 1}</span><span>{label}</span>
+                  <span className="event-step-number">{index + 1}</span>{label}
                 </button>
               ))}
             </nav>
@@ -1009,7 +1014,7 @@ function Events() {
                       <div className="race-benefits-editor full">
                         <div className="race-prize-heading"><strong>ผู้สมัครระยะ {race.name || "นี้"} จะได้รับอะไรบ้าง?</strong></div>
                         <p className="benefits-help">เลือกได้หลายข้อ ไม่เลือกได้หากยังไม่กำหนด</p>
-                        <div className="race-benefit-presets" role="group" aria-label={`สิ่งที่ได้รับของระยะ ${race.name}`}>{[{ value: "เสื้อ", label: "เสื้อที่ระลึก" }, { value: "BIB", label: "หมายเลขวิ่ง (BIB)" }, { value: "เหรียญ", label: "เหรียญที่ระลึก" }].map(({ value, label }) => <label className="benefit-choice" key={value}><input type="checkbox" checked={race.benefits.includes(value)} disabled={!race.benefits.includes(value) && race.benefits.length >= 20} onChange={(e) => setRace(index, { benefits: e.target.checked ? [...race.benefits, value] : race.benefits.filter((item) => item !== value) })} /><span>{label}</span></label>)}</div>
+                        <div className="race-benefit-presets" role="group" aria-label={`สิ่งที่ได้รับของระยะ ${race.name}`}>{[{ value: "เสื้อ", label: "เสื้อที่ระลึก" }, { value: "BIB", label: "หมายเลขวิ่ง (BIB)" }, { value: "เหรียญ", label: "เหรียญที่ระลึก" }].map(({ value, label }) => <label className="benefit-choice" key={value}><input type="checkbox" checked={race.benefits.includes(value)} disabled={!race.benefits.includes(value) && race.benefits.length >= 20} onChange={(e) => setRace(index, { benefits: e.target.checked ? [...race.benefits, value] : race.benefits.filter((item) => item !== value) })} />{label}</label>)}</div>
                         <div className="benefits-custom-heading"><span>สิ่งที่ได้รับอื่น ๆ</span><button type="button" className="text-link" disabled={race.benefits.length >= 20} onClick={() => setRace(index, { benefits: [...race.benefits, ""] })}><Plus size={15} aria-hidden="true" />เพิ่มรายการอื่น</button></div>
                         <FieldError message={fields[`races.${index}.benefits`]} />
                         {race.benefits.map((benefit, benefitIndex) => ["เสื้อ", "BIB", "เหรียญ"].includes(benefit) ? null : <div className="event-contact-phone-row" key={benefitIndex}><label>รายการอื่น<input key={`${benefitIndex}-${benefit}`} defaultValue={benefit} maxLength={100} placeholder="เช่น อาหารหลังวิ่ง หรือกระเป๋าที่ระลึก" onBlur={(e) => setRace(index, { benefits: race.benefits.map((value, i) => i === benefitIndex ? e.target.value : value) })} /><FieldError message={fields[`races.${index}.benefits.${benefitIndex}`]} /></label><button type="button" className="button small-button" aria-label={`ลบสิ่งที่ได้รับ ${benefitIndex + 1} ของระยะ ${race.name}`} onClick={() => setRace(index, { benefits: race.benefits.filter((_, i) => i !== benefitIndex) })}><Trash2 size={16} aria-hidden="true" />ลบ</button></div>)}

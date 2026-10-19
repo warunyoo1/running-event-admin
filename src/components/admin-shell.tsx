@@ -4,13 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  LayoutDashboard,
   Flag,
-  ShoppingBag,
-  ScanLine,
-  Users,
-  Truck,
-  ChartNoAxesCombined,
   ShieldCheck,
   ChevronDown,
   ChevronRight,
@@ -19,7 +13,6 @@ import {
   LogOut,
   KeyRound,
   CircleHelp,
-  History,
 } from "lucide-react";
 import { useAuth } from "@/features/admin/auth-provider";
 import { useScope } from "@/features/admin/scope-provider";
@@ -37,40 +30,40 @@ import { EventScopeSelect } from "./event-scope-select";
 type NavItem = {
   href: string;
   title: string;
-  icon: typeof Flag;
+  emoji: string;
   scope: "event" | "global";
   superOnly?: boolean;
 };
 
 const navigation: NavItem[] = [
-  { href: "/", title: "ภาพรวม", icon: LayoutDashboard, scope: "event" },
-  { href: "/orders", title: "ออเดอร์", icon: ShoppingBag, scope: "event" },
-  { href: "/slips", title: "ตรวจสลิป", icon: ScanLine, scope: "event" },
-  { href: "/participants", title: "ผู้สมัคร", icon: Users, scope: "event" },
+  { href: "/", title: "ภาพรวม", emoji: "📊", scope: "event" },
+  { href: "/orders", title: "ออเดอร์", emoji: "🛍️", scope: "event" },
+  { href: "/slips", title: "ตรวจสลิป", emoji: "🧾", scope: "event" },
+  { href: "/participants", title: "ผู้สมัคร", emoji: "👥", scope: "event" },
   {
     href: "/shipping",
     title: "รับชุดวิ่งและจัดส่ง",
-    icon: Truck,
+    emoji: "📦",
     scope: "event",
   },
   {
     href: "/reports",
     title: "รายงาน",
-    icon: ChartNoAxesCombined,
+    emoji: "📈",
     scope: "event",
   },
-  { href: "/events", title: "จัดการงานวิ่ง", icon: Flag, scope: "global" },
+  { href: "/events", title: "จัดการงานวิ่ง", emoji: "🏁", scope: "global" },
   {
     href: "/users",
     title: "ผู้ใช้และสิทธิ์",
-    icon: ShieldCheck,
+    emoji: "🔐",
     scope: "global",
     superOnly: true,
   },
   {
     href: "/audit-logs",
     title: "ประวัติการใช้งาน",
-    icon: History,
+    emoji: "🕘",
     scope: "global",
     superOnly: true,
   },
@@ -180,14 +173,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   function renderNavigation(scope: "event" | "global") {
     return visibleNavigation
       .filter((item) => item.scope === scope)
-      .map(({ href, title: label, icon: Icon }) => (
+      .map(({ href, title: label, emoji }) => (
         <Link
           className={`nav-item ${pathname === href ? "active" : ""}`}
           key={href}
           href={href}
           aria-current={pathname === href ? "page" : undefined}
         >
-          <Icon size={19} aria-hidden="true" />
+          <span className="nav-emoji" aria-hidden="true">{emoji}</span>
           <span>{label}</span>
           {href === "/slips" && waiting > 0 && (
             <span

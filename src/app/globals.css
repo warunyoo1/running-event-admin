@@ -3237,3 +3237,5 @@ input[type="checkbox"] {
  .event-editor-steps button { justify-content: flex-start; min-height: 48px; font-size: 12px; padding: 8px; gap: 8px; }
  .event-editor-position { display: none; }
 }
+
+.nav-emoji { display: inline-flex; align-items: center; justify-content: center; width: 22px; flex: 0 0 22px; font-size: 19px; line-height: 1; }
