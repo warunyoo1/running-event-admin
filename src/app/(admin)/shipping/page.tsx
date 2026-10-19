@@ -8,7 +8,7 @@ import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useDebounced } from "@/features/admin/use-debounced";
 import { useToast } from "@/features/admin/toast-provider";
-import { formatAddress } from "@/features/admin/format";
+import { exportLimitNotice, formatAddress } from "@/features/admin/format";
 import { exportsApi, ordersApi, participantsApi, shippingApi } from "@/lib/api";
 import { errorMessage, fieldErrorsFor, formMessage } from "@/lib/api/errors";
 import { EXPORT_LIMIT, PAGE_SIZE } from "@/lib/constants";
@@ -66,7 +66,7 @@ function TrackingModal({
         <div className="modal-body form-grid">
           <p className="full muted">ออเดอร์ {order.orderNo}</p>
           <label className="full">
-            ผู้ให้บริการขนส่ง
+            บริษัทขนส่ง
             <input
               autoFocus
               required
@@ -143,7 +143,7 @@ export default function ShippingPage() {
     setBusyId(id);
     try {
       await participantsApi.patchParticipant(id, { collected: !collected });
-      notify(collected ? "ยกเลิกสถานะรับอุปกรณ์แล้ว" : "บันทึกการรับอุปกรณ์แล้ว");
+      notify(collected ? "เปลี่ยนเป็น “ยังไม่ได้รับชุดวิ่ง” แล้ว" : "บันทึกว่ารับชุดวิ่งแล้ว");
       reload();
     } catch (failure) {
       notify(errorMessage(failure));
@@ -160,7 +160,7 @@ export default function ShippingPage() {
         q,
       });
       if (count >= EXPORT_LIMIT) {
-        notify(`ส่งออกได้สูงสุด ${EXPORT_LIMIT.toLocaleString("th-TH")} รายการ ข้อมูลอาจไม่ครบ`);
+        notify(exportLimitNotice(EXPORT_LIMIT));
       }
     } catch (failure) {
       notify(errorMessage(failure));
@@ -179,8 +179,8 @@ export default function ShippingPage() {
   return (
     <>
       <PageHeading
-        title="รับอุปกรณ์และจัดส่ง"
-        description="จัดการเสื้อและบิบสำหรับออเดอร์ที่ชำระเงินแล้ว"
+        title="รับชุดวิ่งและจัดส่ง"
+        description="ติดตามการรับเสื้อและเลข BIB (เลขหน้าอก) หรือการส่งพัสดุ เฉพาะออเดอร์ที่ชำระเงินแล้ว"
         action={
           <button
             className="button"
@@ -188,7 +188,7 @@ export default function ShippingPage() {
             onClick={download}
           >
             <Download size={16} aria-hidden="true" />
-            ส่งออกรายการ
+            ดาวน์โหลดรายการ (CSV)
           </button>
         }
       />
@@ -196,7 +196,7 @@ export default function ShippingPage() {
         <div
           className="tabs"
           role="tablist"
-          aria-label="วิธีรับอุปกรณ์"
+          aria-label="วิธีรับชุดวิ่ง"
           onKeyDown={handleTabKeys}
         >
           <button
@@ -208,7 +208,7 @@ export default function ShippingPage() {
             onClick={() => changeTab("pickup")}
           >
             <PackageCheck size={17} aria-hidden="true" />
-            รับด้วยตนเอง
+            รับเองที่หน้างาน
             {tab === "pickup" && data && <span>{data.meta.total}</span>}
           </button>
           <button
@@ -220,7 +220,7 @@ export default function ShippingPage() {
             onClick={() => changeTab("shipping")}
           >
             <Truck size={17} aria-hidden="true" />
-            จัดส่งพัสดุ
+            ส่งพัสดุ
             {tab === "shipping" && data && <span>{data.meta.total}</span>}
           </button>
         </div>
@@ -246,13 +246,13 @@ export default function ShippingPage() {
                   <table>
                     <thead>
                       <tr>
-                        <th>ออเดอร์</th>
+                        <th>เลขออเดอร์</th>
                         <th>
                           {tab === "pickup"
                             ? "ผู้สมัคร / ไซซ์เสื้อ"
                             : "ผู้ติดต่อ / ที่อยู่จัดส่ง"}
                         </th>
-                        <th>{tab === "pickup" ? "สถานะรับอุปกรณ์" : "เลขพัสดุ"}</th>
+                        <th>{tab === "pickup" ? "รับชุดวิ่งแล้วหรือยัง" : "เลขพัสดุ"}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -265,8 +265,8 @@ export default function ShippingPage() {
                                 <div className="pickup-person" key={p.id}>
                                   <strong>{p.name}</strong>
                                   <small>
-                                    {p.race} · เสื้อ {p.size} · BIB{" "}
-                                    {p.bibNo || "ยังไม่กำหนด"}
+                                    {p.race} · เสื้อ {p.size} · เลข BIB{" "}
+                                    {p.bibNo || "ยังไม่ระบุ"}
                                   </small>
                                 </div>
                               ))
@@ -297,8 +297,8 @@ export default function ShippingPage() {
                                     }
                                   />
                                   {p.collected
-                                    ? "รับอุปกรณ์แล้ว"
-                                    : "ยังไม่รับอุปกรณ์"}
+                                    ? "รับชุดวิ่งแล้ว"
+                                    : "ยังไม่ได้รับชุดวิ่ง"}
                                 </label>
                               ))
                             ) : writable ? (
@@ -327,8 +327,8 @@ export default function ShippingPage() {
               </>
             ) : (
               <EmptyState
-                title="ไม่มีรายการรับอุปกรณ์ในตัวกรองนี้"
-                description="หน้านี้จะแสดงเฉพาะออเดอร์ที่ชำระเงินแล้ว"
+                title="ไม่พบรายการ"
+                description="หน้านี้แสดงเฉพาะออเดอร์ที่ชำระเงินแล้ว"
               />
             ))}
         </div>

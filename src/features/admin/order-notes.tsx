@@ -35,7 +35,7 @@ export function OrderNotes({
     event.preventDefault();
     const value = text.trim();
     if (!value) {
-      setTextError("กรุณากรอกบันทึก");
+      setTextError("พิมพ์บันทึกก่อนกดเพิ่ม");
       return;
     }
     setPending(true);
@@ -71,7 +71,7 @@ export function OrderNotes({
 
   return (
     <section className="order-section" aria-labelledby={`${fieldId}-title`}>
-      <h3 id={`${fieldId}-title`}>บันทึกภายใน</h3>
+      <h3 id={`${fieldId}-title`}>บันทึกของทีมงาน</h3>
       {notes.length === 0 ? (
         <p className="muted">ยังไม่มีบันทึก</p>
       ) : (
@@ -83,19 +83,19 @@ export function OrderNotes({
               <li key={note.id}>
                 <p className="note-text">{note.text}</p>
                 <small>
-                  {note.author?.name ?? "ผู้ใช้ที่ถูกลบ"} · {date(note.createdAt, true)}
+                  {note.author?.name ?? "ผู้ใช้ที่ถูกลบไปแล้ว"} · {date(note.createdAt, true)}
                 </small>
                 {canDelete &&
                   (confirmingId === note.id ? (
                     <div className="note-actions" role="group" aria-label="ยืนยันการลบบันทึก">
-                      <span>ลบบันทึกนี้ใช่หรือไม่</span>
+                      <span>ลบบันทึกนี้? กู้คืนไม่ได้</span>
                       <button
                         type="button"
                         className="button small-button danger"
                         disabled={pending}
                         onClick={() => void remove(note.id)}
                       >
-                        ยืนยันลบ
+                        ลบบันทึก
                       </button>
                       <button
                         type="button"
@@ -129,7 +129,7 @@ export function OrderNotes({
       )}
       {canWrite(user.role) && (
         <form className="note-form" onSubmit={(event) => void submit(event)}>
-          <label htmlFor={`${fieldId}-text`}>เพิ่มบันทึกภายใน</label>
+          <label htmlFor={`${fieldId}-text`}>เพิ่มบันทึก (เฉพาะทีมงานเห็น)</label>
           <textarea
             id={`${fieldId}-text`}
             value={text}
@@ -138,7 +138,7 @@ export function OrderNotes({
             aria-describedby={`${fieldId}-count`}
             disabled={pending}
             onChange={(e) => setText(e.target.value)}
-            placeholder="เช่น ลูกค้าโทรขอเปลี่ยนเวลารับเสื้อ (ผู้สมัครมองไม่เห็นบันทึกนี้)"
+            placeholder="เช่น โทรคุยกับผู้สมัครแล้ว ขอเปลี่ยนวันรับเสื้อ"
           />
           <small id={`${fieldId}-count`} className="muted">
             {text.length}/{ORDER_NOTE_MAX}

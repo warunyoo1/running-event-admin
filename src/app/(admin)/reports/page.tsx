@@ -11,7 +11,7 @@ import {
 import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useToast } from "@/features/admin/toast-provider";
-import { money, number, statusLabels } from "@/features/admin/format";
+import { exportLimitNotice, money, number, statusLabels } from "@/features/admin/format";
 import { exportsApi, reportsApi } from "@/lib/api";
 import { errorMessage } from "@/lib/api/errors";
 import { EXPORT_LIMIT, SHIRT_SIZES } from "@/lib/constants";
@@ -65,7 +65,7 @@ export default function ReportsPage() {
         to: end,
       });
       if (count >= EXPORT_LIMIT) {
-        notify(`ส่งออกได้สูงสุด ${EXPORT_LIMIT.toLocaleString("th-TH")} รายการ ข้อมูลอาจไม่ครบ`);
+        notify(exportLimitNotice(EXPORT_LIMIT));
       }
     } catch (failure) {
       notify(errorMessage(failure));
@@ -90,7 +90,7 @@ export default function ReportsPage() {
     <>
       <PageHeading
         title="รายงาน"
-        description="สรุปยอดสมัคร ยอดรับเงิน และจำนวนเสื้อเพื่อเตรียมงาน"
+        description="สรุปผู้สมัคร ยอดเงิน และจำนวนเสื้อแต่ละไซซ์ ไว้เตรียมงาน"
         action={
           <button
             className="button"
@@ -98,7 +98,7 @@ export default function ReportsPage() {
             onClick={downloadReport}
           >
             <Download size={16} aria-hidden="true" />
-            ส่งออกรายงาน
+            ดาวน์โหลดออเดอร์ (CSV)
           </button>
         }
       />
@@ -128,7 +128,7 @@ export default function ReportsPage() {
       </div>
       {invalidRange && (
         <p role="alert" className="form-error">
-          วันที่เริ่มต้นต้องไม่อยู่หลังวันที่สิ้นสุด
+          วันที่เริ่มต้องไม่เลยวันที่สิ้นสุด กรุณาเลือกใหม่
         </p>
       )}
       {summary.error && (
@@ -137,9 +137,9 @@ export default function ReportsPage() {
       {!summary.data && summary.loading && <LoadingState />}
       <div className="stats-grid three">
         <StatCard
-          title="ยอดชำระเงินแล้ว"
+          title="ยอดเงินที่รับแล้ว"
           value={summary.data ? money(summary.data.totals.paidRevenue) : "–"}
-          note="รวมค่าจัดส่ง ไม่ใช่กำไรสุทธิ"
+          note="รวมค่าจัดส่ง ยังไม่หักต้นทุน"
           icon={CircleDollarSign}
           accent
         />
@@ -152,7 +152,7 @@ export default function ReportsPage() {
         <StatCard
           title="เสื้อที่ต้องเตรียม"
           value={shirts.data ? `${number(shirtTotal)} ตัว` : "–"}
-          note={`สำหรับออเดอร์สถานะ ${statusLabels[shirtStatus]}`}
+          note={`นับเฉพาะออเดอร์สถานะ “${statusLabels[shirtStatus]}”`}
           icon={Shirt}
         />
       </div>
@@ -160,8 +160,8 @@ export default function ReportsPage() {
         <section className="panel">
           <div className="panel-heading">
             <div>
-              <h2>สรุปผู้สมัครตามระยะ</h2>
-              <p>ผู้สมัครที่มีสิทธิ์และที่ชำระเงินแล้ว</p>
+              <h2>สรุปตามระยะวิ่ง</h2>
+              <p>จำนวนผู้สมัครและจำนวนที่ชำระเงินแล้วของแต่ละระยะ</p>
             </div>
             <ClipboardList size={19} aria-hidden="true" />
           </div>
@@ -172,7 +172,7 @@ export default function ReportsPage() {
                   <thead>
                     <tr>
                       <th>งานวิ่ง</th>
-                      <th>ระยะ</th>
+                      <th>ระยะวิ่ง</th>
                       <th className="numeric">ผู้สมัคร</th>
                       <th className="numeric">ชำระแล้ว</th>
                       <th className="numeric">ยอดเงิน</th>
@@ -203,7 +203,7 @@ export default function ReportsPage() {
           <div className="panel-heading">
             <div>
               <h2>จำนวนเสื้อตามไซซ์</h2>
-              <p>รวมทุกระยะในตัวกรองนี้</p>
+              <p>รวมทุกระยะวิ่งของงานที่เลือก</p>
             </div>
             <Shirt size={19} aria-hidden="true" />
           </div>
@@ -252,13 +252,13 @@ export default function ReportsPage() {
                 onClick={downloadShirtSizes}
               >
                 <Download size={15} aria-hidden="true" />
-                ส่งออกจำนวนเสื้อ
+                ดาวน์โหลดจำนวนเสื้อ (CSV)
               </button>
             </>
           )}
         </section>
       </div>
-      <p className="page-note">วันที่ใช้เขตเวลาประเทศไทย</p>
+      <p className="page-note">วันที่แสดงตามเวลาประเทศไทย</p>
     </>
   );
 }

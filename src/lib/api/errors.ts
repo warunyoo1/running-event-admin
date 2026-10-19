@@ -10,13 +10,13 @@ export class ApiError extends Error {
   }
 }
 
-export const UNKNOWN_ERROR_MESSAGE = "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+export const UNKNOWN_ERROR_MESSAGE = "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง ถ้ายังไม่หายให้แจ้งผู้ดูแลระบบ";
 
 /** Field errors keyed by the API's dotted path (e.g. `races.0.quota`). */
 export function fieldErrorsFor(error: unknown): Record<string, string> {
   if (!(error instanceof ApiError)) return {};
   // The API sends 409 SLUG_TAKEN without `fields`; attach it to the slug input.
-  if (error.code === "SLUG_TAKEN") return { ...error.fields, slug: "ลิงก์นี้ถูกใช้แล้ว" };
+  if (error.code === "SLUG_TAKEN") return { ...error.fields, slug: "ลิงก์นี้มีงานอื่นใช้อยู่แล้ว ลองเปลี่ยนชื่อลิงก์" };
   return error.fields;
 }
 

@@ -25,7 +25,7 @@ export default function AuditLogsPage() {
     return (
       <EmptyState
         title="ไม่มีสิทธิ์เข้าถึง"
-        description="เฉพาะผู้ดูแลระบบเท่านั้นที่ดูประวัติการใช้งานได้"
+        description="หน้านี้ดูได้เฉพาะผู้ดูแลระบบ"
       />
     );
   }
@@ -67,18 +67,18 @@ function AuditLogs() {
     <>
       <PageHeading
         title="ประวัติการใช้งาน"
-        description="ตรวจสอบว่าใครทำอะไรในระบบและเมื่อไร เห็นได้เฉพาะผู้ดูแลระบบ"
+        description="ดูว่าใครทำอะไรในระบบ และทำเมื่อไร ดูได้เฉพาะผู้ดูแลระบบ"
         scope="global"
       />
       <div className="panel">
         <div className="filter-bar in-panel">
           <label>
-            <span className="sr-only">ผู้ทำรายการ</span>
+            <span className="sr-only">ทำโดย</span>
             <select
               value={userId}
               onChange={(e) => changeFilter(() => setUserId(e.target.value))}
             >
-              <option value="">ผู้ทำรายการทั้งหมด</option>
+              <option value="">ทุกคน</option>
               {(users.data ?? []).map((u) => (
                 <option value={u.id} key={u.id}>
                   {u.name}
@@ -87,12 +87,12 @@ function AuditLogs() {
             </select>
           </label>
           <label>
-            <span className="sr-only">การกระทำ</span>
+            <span className="sr-only">สิ่งที่ทำ</span>
             <select
               value={action}
               onChange={(e) => changeFilter(() => setAction(e.target.value))}
             >
-              <option value="">การกระทำทั้งหมด</option>
+              <option value="">ทุกอย่างที่ทำ</option>
               {Object.entries(auditActionLabels).map(([key, label]) => (
                 <option value={key} key={key}>
                   {label}
@@ -101,14 +101,14 @@ function AuditLogs() {
             </select>
           </label>
           <label>
-            <span className="sr-only">ประเภทข้อมูล</span>
+            <span className="sr-only">เกี่ยวกับ</span>
             <select
               value={entity}
               onChange={(e) =>
                 changeFilter(() => setEntity(e.target.value as AuditEntity | ""))
               }
             >
-              <option value="">ทุกประเภท</option>
+              <option value="">ทุกเรื่อง</option>
               {AUDIT_ENTITIES.map((key) => (
                 <option value={key} key={key}>
                   {auditEntityLabels[key]}
@@ -117,11 +117,11 @@ function AuditLogs() {
             </select>
           </label>
           <label>
-            <span className="sr-only">รหัสออเดอร์ / งานวิ่ง</span>
+            <span className="sr-only">รหัสอ้างอิงของออเดอร์หรืองานวิ่ง</span>
             <input
               type="search"
               value={targetId}
-              placeholder="รหัสออเดอร์ / งานวิ่ง (24 ตัวอักษร)"
+              placeholder="รหัสอ้างอิงของออเดอร์หรืองาน (24 ตัว)"
               aria-invalid={invalidTarget}
               onChange={(e) => changeFilter(() => setTargetId(e.target.value))}
             />
@@ -150,12 +150,12 @@ function AuditLogs() {
         </div>
         {invalidRange && (
           <p role="alert" className="form-error">
-            วันที่เริ่มต้นต้องไม่อยู่หลังวันที่สิ้นสุด
+            วันที่เริ่มต้องไม่เลยวันที่สิ้นสุด กรุณาเลือกใหม่
           </p>
         )}
         {invalidTarget && (
           <p role="alert" className="form-error">
-            รหัสต้องเป็นตัวอักษร 0-9 และ a-f จำนวน 24 ตัว
+            รหัสไม่ถูกต้อง ต้องมี 24 ตัว ใช้ได้เฉพาะ 0-9 และ a-f
           </p>
         )}
         {error && <ErrorState message={error} onRetry={reload} />}
@@ -168,10 +168,10 @@ function AuditLogs() {
                   <thead>
                     <tr>
                       <th>เวลา</th>
-                      <th>ผู้ทำรายการ</th>
-                      <th>การกระทำ</th>
-                      <th className="table-secondary">รายการที่เกี่ยวข้อง</th>
-                      <th className="table-secondary">รายละเอียด</th>
+                      <th>ทำโดย</th>
+                      <th>สิ่งที่ทำ</th>
+                      <th className="table-secondary">เกี่ยวกับ</th>
+                      <th className="table-secondary">ข้อมูลเพิ่มเติม</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -185,7 +185,7 @@ function AuditLogs() {
                               <small className="cell-sub">{row.actor.email}</small>
                             </>
                           ) : (
-                            <span className="muted">ระบบ</span>
+                            <span className="muted">ระบบอัตโนมัติ</span>
                           )}
                         </td>
                         <td className="strong">
@@ -210,7 +210,7 @@ function AuditLogs() {
                         <td className="table-secondary">
                           {row.meta ? (
                             <details>
-                              <summary>ดูรายละเอียด</summary>
+                              <summary>ดูข้อมูลเพิ่มเติม</summary>
                               <pre>{JSON.stringify(row.meta, null, 2)}</pre>
                             </details>
                           ) : (

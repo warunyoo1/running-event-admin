@@ -8,7 +8,7 @@ export default function NotFound() {
       <Flag size={40} aria-hidden="true" />
       <p>404</p>
       <h1>ไม่พบหน้าที่คุณต้องการ</h1>
-      <p>ลิงก์อาจไม่ถูกต้อง หรือหน้านี้ยังไม่เปิดใช้งาน</p>
+      <p>ลิงก์อาจพิมพ์ผิด หรือหน้านี้ถูกย้ายไปแล้ว</p>
       <Link className="button primary" href="/">
         กลับไปหน้าภาพรวม
       </Link>

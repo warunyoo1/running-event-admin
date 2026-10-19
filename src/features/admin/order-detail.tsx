@@ -17,7 +17,7 @@ import { ErrorState, LoadingState } from "@/components/data-states";
 import { Badge, Modal } from "@/components/ui";
 
 const TRANSACTION_REF = /^[A-Za-z0-9\-_/.]{3,64}$/;
-const TRANSACTION_REF_HINT = "ใช้ตัวอักษรอังกฤษ ตัวเลข หรือ - _ / . ความยาว 3–64 ตัวอักษร";
+const TRANSACTION_REF_HINT = "กรอก 3–64 ตัว ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข และ - _ / .";
 const REASON_MAX = 500;
 
 type Mode = "view" | "rejecting" | "cancelling";
@@ -28,7 +28,7 @@ function SlipImage({ paymentId }: { paymentId: string | null }) {
     return (
       <>
         <ScanLine size={34} aria-hidden="true" />
-        <p role="status">ไม่พบไฟล์สลิป</p>
+        <p role="status">ไม่พบรูปสลิป</p>
       </>
     );
   }
@@ -105,12 +105,12 @@ export function OrderDetail({
 
   function reject(current: OrderDetailData) {
     if (!reason.trim()) {
-      setFieldErrors({ reason: "กรุณาระบุเหตุผลที่สลิปไม่ผ่าน" });
+      setFieldErrors({ reason: "กรุณาพิมพ์เหตุผลที่ปฏิเสธสลิป" });
       return;
     }
     void run(
       () => ordersApi.rejectOrder(current.id, reason.trim()),
-      `บันทึกผลตรวจสลิป ${current.orderNo} แล้ว`,
+      `ปฏิเสธสลิป ${current.orderNo} แล้ว`,
     );
   }
 
@@ -121,7 +121,7 @@ export function OrderDetail({
     );
   }
 
-  const title = review ? "ตรวจสอบสลิปชำระเงิน" : "รายละเอียดออเดอร์";
+  const title = review ? "ตรวจสลิป" : "รายละเอียดออเดอร์";
   if (!order) {
     return (
       <Modal title={title} wide onClose={onClose}>
@@ -131,7 +131,7 @@ export function OrderDetail({
         </div>
         <div className="modal-actions">
           <button className="button" onClick={onClose}>
-            ปิดรายละเอียด
+            ปิด
           </button>
         </div>
       </Modal>
@@ -181,11 +181,11 @@ export function OrderDetail({
                 <dd className="amount-highlight">{money(order.amount)}</dd>
               </div>
               <div>
-                <dt>การรับอุปกรณ์</dt>
+                <dt>วิธีรับชุดวิ่ง</dt>
                 <dd>
                   {order.delivery === "pickup"
-                    ? "รับด้วยตนเอง"
-                    : "จัดส่งทางพัสดุ"}
+                    ? "รับเองที่หน้างาน"
+                    : "ส่งพัสดุ"}
                 </dd>
               </div>
               {order.address && (
@@ -216,13 +216,13 @@ export function OrderDetail({
               )}
               {order.transactionRef && (
                 <div>
-                  <dt>เลขอ้างอิงธุรกรรม</dt>
+                  <dt>เลขอ้างอิงการโอน</dt>
                   <dd>{order.transactionRef}</dd>
                 </div>
               )}
               {order.reviewedAt && (
                 <div>
-                  <dt>ตรวจสอบโดย</dt>
+                  <dt>ตรวจโดย</dt>
                   <dd>
                     {order.reviewedByName ?? order.reviewedBy}
                     <small>{date(order.reviewedAt, true)}</small>
@@ -271,7 +271,7 @@ export function OrderDetail({
         </div>
         {canReview && mode === "view" && (
           <label className="rejection-field">
-            เลขอ้างอิงธุรกรรมจากสลิป
+            เลขอ้างอิงการโอน (ดูจากสลิป)
             <input
               value={transactionRef}
               maxLength={64}
@@ -291,7 +291,7 @@ export function OrderDetail({
         )}
         {mode === "rejecting" && (
           <label className="rejection-field">
-            เหตุผลที่สลิปไม่ผ่าน
+            เหตุผลที่ปฏิเสธสลิป
             <textarea
               autoFocus
               required
@@ -299,7 +299,7 @@ export function OrderDetail({
               aria-invalid={Boolean(fieldErrors.reason)}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="เช่น ยอดเงินไม่ตรง หรือภาพไม่ชัดเจน"
+              placeholder="เช่น ยอดเงินไม่ตรง หรือรูปไม่ชัด"
             />
             {fieldErrors.reason && (
               <small className="danger-text">{fieldErrors.reason}</small>
@@ -314,8 +314,11 @@ export function OrderDetail({
               maxLength={REASON_MAX}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="ยืนยันการยกเลิกออเดอร์นี้ ที่นั่งจะถูกคืนโควตา"
+              placeholder="เช่น ผู้สมัครขอยกเลิก"
             />
+            <small className="muted">
+              ยกเลิกแล้วกู้คืนไม่ได้ และที่นั่งจะกลับไปเปิดให้คนอื่นสมัคร
+            </small>
             {fieldErrors.reason && (
               <small className="danger-text">{fieldErrors.reason}</small>
             )}
@@ -339,7 +342,7 @@ export function OrderDetail({
               disabled={pending}
               onClick={() => reject(order)}
             >
-              ยืนยันสลิปไม่ผ่าน
+              ปฏิเสธสลิป
             </button>
           </>
         ) : mode === "cancelling" ? (
@@ -374,7 +377,7 @@ export function OrderDetail({
                   }}
                 >
                   <X size={16} aria-hidden="true" />
-                  สลิปไม่ผ่าน
+                  ปฏิเสธสลิป
                 </button>
                 <button
                   className="button primary"
@@ -382,7 +385,7 @@ export function OrderDetail({
                   onClick={() => approve(order)}
                 >
                   <ShieldCheck size={17} aria-hidden="true" />
-                  อนุมัติการชำระเงิน
+                  อนุมัติสลิป
                 </button>
               </>
             )}
@@ -402,7 +405,7 @@ export function OrderDetail({
             {!canReview && (
               <button className="button" onClick={onClose}>
                 <Check size={16} aria-hidden="true" />
-                ปิดรายละเอียด
+                ปิด
               </button>
             )}
           </>

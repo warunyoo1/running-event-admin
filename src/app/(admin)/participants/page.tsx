@@ -8,7 +8,7 @@ import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useDebounced } from "@/features/admin/use-debounced";
 import { useToast } from "@/features/admin/toast-provider";
-import { statusLabels } from "@/features/admin/format";
+import { exportLimitNotice, statusLabels } from "@/features/admin/format";
 import { exportsApi, participantsApi } from "@/lib/api";
 import { errorMessage, fieldErrorsFor } from "@/lib/api/errors";
 import { EXPORT_LIMIT, PAGE_SIZE } from "@/lib/constants";
@@ -63,7 +63,7 @@ function BibCell({
   if (!editing) {
     return (
       <span className="bib-edit">
-        {participant.bibNo || "ยังไม่กำหนด"}
+        {participant.bibNo || "ยังไม่ระบุ"}
         {editable && (
           <button
             className="icon-button"
@@ -152,7 +152,7 @@ export default function ParticipantsPage() {
     try {
       const { rows: count } = await exportsApi.exportParticipantsCsv(filters);
       if (count >= EXPORT_LIMIT) {
-        notify(`ส่งออกได้สูงสุด ${EXPORT_LIMIT.toLocaleString("th-TH")} รายการ ข้อมูลอาจไม่ครบ`);
+        notify(exportLimitNotice(EXPORT_LIMIT));
       }
     } catch (failure) {
       notify(errorMessage(failure));
@@ -168,7 +168,7 @@ export default function ParticipantsPage() {
     <>
       <PageHeading
         title="ผู้สมัคร"
-        description="รายชื่อผู้สมัคร แยกตามงานวิ่ง ระยะ และไซซ์เสื้อ"
+        description="รายชื่อผู้สมัครทุกคน กรองตามระยะวิ่งหรือสถานะออเดอร์ได้ ใส่เลข BIB (เลขหน้าอก) ให้คนที่ชำระเงินแล้ว"
         action={
           <button
             className="button"
@@ -176,7 +176,7 @@ export default function ParticipantsPage() {
             onClick={download}
           >
             <Download size={16} aria-hidden="true" />
-            ส่งออกรายชื่อ
+            ดาวน์โหลดรายชื่อ (CSV)
           </button>
         }
       />
@@ -184,7 +184,7 @@ export default function ParticipantsPage() {
         <Users size={20} aria-hidden="true" />
         <span>
           ทั้งหมด <strong>{data ? data.meta.total : "–"} คน</strong>{" "}
-          ในตัวกรองนี้
+          ตามที่กรองอยู่
         </span>
       </div>
       <section className="panel">
@@ -192,15 +192,15 @@ export default function ParticipantsPage() {
           <SearchField
             value={query}
             onChange={(value) => changeFilter(() => setQuery(value))}
-            placeholder="ค้นหาชื่อ เลข BIB หรือออเดอร์"
+            placeholder="ค้นหาชื่อ เลข BIB หรือเลขออเดอร์"
           />
           <label>
-            <span className="sr-only">ระยะ</span>
+            <span className="sr-only">ระยะวิ่ง</span>
             <select
               value={race}
               onChange={(e) => changeFilter(() => setRace(e.target.value))}
             >
-              <option value="">ทุกระยะ</option>
+              <option value="">ทุกระยะวิ่ง</option>
               {raceNames.map((name) => (
                 <option value={name} key={name}>
                   {name}
@@ -235,11 +235,11 @@ export default function ParticipantsPage() {
                   <thead>
                     <tr>
                       <th>ผู้สมัคร</th>
-                      <th>ระยะ</th>
+                      <th>ระยะวิ่ง</th>
                       <th>ไซซ์เสื้อ</th>
-                      <th>เลข BIB</th>
-                      <th>ออเดอร์</th>
-                      <th>สถานะชำระเงิน</th>
+                      <th>เลข BIB (เลขหน้าอก)</th>
+                      <th>เลขออเดอร์</th>
+                      <th>สถานะออเดอร์</th>
                     </tr>
                   </thead>
                   <tbody>

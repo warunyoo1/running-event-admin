@@ -25,20 +25,20 @@ type Failure = { name: string; reason: string };
 export function imageErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return errorMessage(error);
   const { status, code, fields } = error;
-  if (status === 413) return `ไฟล์ใหญ่เกิน ${EVENT_IMAGE_MAX_MB} MB`;
+  if (status === 413) return `ไฟล์ใหญ่เกิน ${EVENT_IMAGE_MAX_MB} MB ลองลดขนาดรูปแล้วเพิ่มใหม่`;
   if (status === 415) return "รองรับเฉพาะไฟล์ JPG, PNG หรือ WEBP";
   if (status === 422) {
     if (code === "IMAGE_LIMIT_REACHED")
-      return `ครบ ${EVENT_IMAGE_MAX_PER_EVENT} รูปแล้ว`;
+      return `งานนี้มีรูปครบ ${EVENT_IMAGE_MAX_PER_EVENT} รูปแล้ว ลบรูปเก่าก่อนจึงจะเพิ่มได้`;
     if (code === "TOO_MANY_FILES")
-      return `อัปโหลดได้ครั้งละไม่เกิน ${EVENT_IMAGE_MAX_FILES_PER_REQUEST} ไฟล์`;
+      return `เลือกได้ครั้งละไม่เกิน ${EVENT_IMAGE_MAX_FILES_PER_REQUEST} ไฟล์ ลองเลือกใหม่`;
     return fields.files ?? fields.kind ?? fields.alt ?? fields.ids ?? error.message;
   }
-  if (status === 409) return "รายการรูปภาพมีการเปลี่ยนแปลง โหลดรายการใหม่ให้แล้ว";
-  if (status === 403) return "ไม่มีสิทธิ์จัดการรูปภาพ";
-  if (status === 404) return "ไม่พบงานวิ่งหรือรูปภาพ (อาจถูกลบแล้ว) กรุณาโหลดใหม่";
-  if (status === 429) return "ทำรายการถี่เกินไป กรุณารอสักครู่";
-  if (code === "UPLOAD_ERROR") return "อัปโหลดไฟล์ไม่สำเร็จ กรุณาลองใหม่";
+  if (status === 409) return "รายการรูปมีการเปลี่ยนแปลงจากที่อื่น โหลดรายการใหม่ให้แล้ว ลองทำอีกครั้ง";
+  if (status === 403) return "คุณไม่มีสิทธิ์จัดการรูปภาพ";
+  if (status === 404) return "ไม่พบงานหรือรูปนี้ (อาจถูกลบไปแล้ว) กรุณาปิดหน้าต่างแล้วเปิดใหม่";
+  if (status === 429) return "ทำรายการถี่เกินไป รอสักครู่แล้วลองอีกครั้ง";
+  if (code === "UPLOAD_ERROR") return "อัปโหลดไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง";
   return error.message;
 }
 
@@ -101,7 +101,7 @@ export async function uploadFiles(
       if (isFatalForBatch(failure)) {
         fatal = true;
         for (const rest of items.slice(index + 1))
-          failures.push({ name: rest.file.name, reason: "ข้ามไฟล์นี้เพราะอัปโหลดก่อนหน้าไม่สำเร็จ" });
+          failures.push({ name: rest.file.name, reason: "ข้ามไฟล์นี้ เพราะไฟล์ก่อนหน้าอัปโหลดไม่สำเร็จ" });
         break;
       }
     }
@@ -150,7 +150,7 @@ function ImageUploadControls({
     <div className="image-upload">
       <div className="image-upload-options">
         <label>
-          {staged ? "ประเภทรูป (ค่าเริ่มต้นของไฟล์ที่เพิ่ม)" : "ประเภทรูป"}
+          {staged ? "ประเภทรูป (ใช้กับรูปที่เพิ่มต่อไปนี้)" : "ประเภทรูป"}
           <select
             value={kind}
             disabled={busy}
@@ -306,7 +306,7 @@ export function StagedImagesSection({
       <legend>รูปภาพ</legend>
       <p className="muted">
         {items.length} / {EVENT_IMAGE_MAX_PER_EVENT} รูป · เพิ่มรูปได้ทั้งตอนสร้างและหลังสร้างงาน
-        รูปที่เลือกจะอัปโหลดหลังกดบันทึกงานวิ่ง
+        รูปที่เลือกจะถูกอัปโหลดหลังกดปุ่ม “สร้างงานวิ่ง”
       </p>
       <ImageUploadControls
         staged
@@ -334,7 +334,7 @@ export function StagedImagesSection({
         </div>
       )}
       {items.length === 0 ? (
-        <p className="muted">ยังไม่ได้เลือกรูป (ข้ามได้ และเพิ่มภายหลังได้)</p>
+        <p className="muted">ยังไม่ได้เลือกรูป (ข้ามได้ เพิ่มทีหลังได้)</p>
       ) : (
         <ul className="image-grid" aria-label="รูปที่รออัปโหลด">
           {items.map((item, index) => {
@@ -584,7 +584,7 @@ export function EventImagesSection({
         </label>
       )}
       {!loading && !loadError && images.length === 0 && (
-        <p className="muted">ยังไม่มีรูปภาพ{canEdit ? " เลือกไฟล์ด้านบนเพื่อเพิ่มรูป" : ""}</p>
+        <p className="muted">ยังไม่มีรูปภาพ{canEdit ? " เลือกไฟล์ด้านบนเพื่อเพิ่มรูปได้เลย" : ""}</p>
       )}
       {groups.map((group) => (
         <section className="image-group" key={group.kind} aria-labelledby={`${ids}-g-${group.kind}`}>
@@ -694,8 +694,8 @@ function ImageCard({
       />
       {canEdit &&
         (confirming ? (
-          <div className="image-actions" role="group" aria-label={`ยืนยันการลบ ${label}`}>
-            <span>ลบรูปนี้ใช่หรือไม่</span>
+          <div className="image-actions" role="group" aria-label={`ยืนยันการลบรูป ${label}`}>
+            <span>ลบรูปนี้? กู้คืนไม่ได้</span>
             <button type="button" className="button small-button danger" disabled={busy} onClick={onDelete}>
               ลบรูป
             </button>
@@ -726,11 +726,12 @@ function ImageCard({
             <button
               type="button"
               className="button small-button danger-outline"
+              aria-label={`ลบรูป ${label}`}
               disabled={busy}
               onClick={onAskDelete}
             >
               <Trash2 size={15} aria-hidden="true" />
-              ลบ
+              ลบรูป
             </button>
           </div>
         ))}

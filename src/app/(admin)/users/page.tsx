@@ -17,7 +17,7 @@ import { useAuth } from "@/features/admin/auth-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useToast } from "@/features/admin/toast-provider";
 import { isSuper } from "@/features/admin/permissions";
-import { date, roleLabels } from "@/features/admin/format";
+import { date, roleDescriptions, roleLabels } from "@/features/admin/format";
 import { usersApi } from "@/lib/api";
 import { errorMessage, fieldErrorsFor, formMessage } from "@/lib/api/errors";
 import { generateTemporaryPassword } from "@/lib/password";
@@ -124,7 +124,7 @@ export default function UsersPage() {
     return (
       <EmptyState
         title="ไม่มีสิทธิ์เข้าถึง"
-        description="เฉพาะผู้ดูแลระบบเท่านั้นที่จัดการผู้ใช้ได้"
+        description="หน้านี้ใช้ได้เฉพาะผู้ดูแลระบบ"
       />
     );
   }
@@ -173,7 +173,7 @@ function Users({ selfId }: { selfId: string }) {
     } catch {
       // Clipboard can be blocked; the visible field is the fallback.
       setShowPassword(true);
-      notify("คัดลอกไม่สำเร็จ กรุณาคัดลอกจากช่องรหัสผ่าน");
+      notify("คัดลอกไม่สำเร็จ ให้เลือกรหัสผ่านในช่องแล้วคัดลอกเอง");
     }
   }
 
@@ -202,7 +202,11 @@ function Users({ selfId }: { selfId: string }) {
           role: editing.role,
         });
       }
-      notify("บันทึกผู้ใช้แล้ว");
+      notify(
+        editing.id
+          ? "บันทึกข้อมูลผู้ใช้แล้ว"
+          : "สร้างผู้ใช้แล้ว ระบบไม่ส่งอีเมล กรุณาแจ้งรหัสผ่านชั่วคราวให้เขาเอง",
+      );
       setEditing(null);
       reload();
     } catch (failure) {
@@ -243,11 +247,11 @@ function Users({ selfId }: { selfId: string }) {
       <PageHeading
         title="ผู้ใช้และสิทธิ์"
         scope="global"
-        description="กำหนดบทบาทของทีมที่เข้ามาจัดการงานวิ่ง ระบบไม่ส่งอีเมลเชิญ กรุณาแจ้งรหัสผ่านชั่วคราวให้ผู้ใช้โดยตรง"
+        description="สร้างบัญชีและกำหนดสิทธิ์ให้ทีมงาน ระบบจะไม่ส่งอีเมลให้ผู้ใช้ กรุณาแจ้งอีเมลและรหัสผ่านชั่วคราวให้เขาเอง"
         action={
           <button className="button primary" onClick={() => open(blankForm, null)}>
             <Plus size={17} aria-hidden="true" />
-            เชิญผู้ใช้ใหม่
+            สร้างผู้ใช้ใหม่
           </button>
         }
       />
@@ -258,7 +262,7 @@ function Users({ selfId }: { selfId: string }) {
             onChange={setQuery}
             placeholder="ค้นหาชื่อหรืออีเมล"
           />
-          <span className="result-count">{data ? `${filtered.length} ผู้ใช้` : ""}</span>
+          <span className="result-count">{data ? `${filtered.length} คน` : ""}</span>
         </div>
         {loadError && <ErrorState message={loadError} onRetry={reload} />}
         {!data && loading && <LoadingState />}
@@ -270,7 +274,7 @@ function Users({ selfId }: { selfId: string }) {
                   <tr>
                     <th>ผู้ใช้</th>
                     <th>อีเมล</th>
-                    <th>บทบาท</th>
+                    <th>สิทธิ์ใช้งาน</th>
                     <th>สถานะ</th>
                     <th>เข้าสู่ระบบล่าสุด</th>
                     <th>จัดการ</th>
@@ -295,10 +299,10 @@ function Users({ selfId }: { selfId: string }) {
                             className={`badge ${u.active ? "badge-paid" : "badge-closed"}`}
                           >
                             <span aria-hidden="true" />
-                            {u.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                            {u.active ? "ใช้งานอยู่" : "ปิดใช้งานแล้ว"}
                           </span>
                           {u.mustChangePassword && (
-                            <small className="cell-sub">ต้องเปลี่ยนรหัสผ่าน</small>
+                            <small className="cell-sub">ยังใช้รหัสผ่านชั่วคราว</small>
                           )}
                         </td>
                         <td className="muted">
@@ -328,13 +332,13 @@ function Users({ selfId }: { selfId: string }) {
                                 onClick={() => openAction({ kind: "delete", target: u })}
                               >
                                 <Trash2 size={14} aria-hidden="true" />
-                                ลบถาวร
+                                ลบผู้ใช้
                               </button>
                             )}
                           </div>
                           {isSelf && (
                             <small className="cell-sub" id={hintId}>
-                              ไม่สามารถปิดใช้งานบัญชีของตัวเองได้
+                              ปิดใช้งานบัญชีของตัวเองไม่ได้
                             </small>
                           )}
                         </td>
@@ -353,19 +357,13 @@ function Users({ selfId }: { selfId: string }) {
           <div key={role}>
             <ShieldCheck size={19} aria-hidden="true" />
             <h2>{roleLabels[role]}</h2>
-            <p>
-              {role === "super_admin"
-                ? "จัดการทุกโมดูล รวมถึงผู้ใช้และสิทธิ์"
-                : role === "reviewer"
-                  ? "ดูออเดอร์ ตรวจสลิป และยืนยันการชำระเงิน"
-                  : "ดูข้อมูลและส่งออกรายงาน โดยไม่แก้ไขข้อมูล"}
-            </p>
+            <p>{roleDescriptions[role]}</p>
           </div>
         ))}
       </div>
       {editing && (
         <Modal
-          title={editing.id ? "แก้ไขผู้ใช้" : "เชิญผู้ใช้ใหม่"}
+          title={editing.id ? "แก้ไขผู้ใช้" : "สร้างผู้ใช้ใหม่"}
           onClose={() => setEditing(null)}
         >
           <form onSubmit={save}>
@@ -401,8 +399,8 @@ function Users({ selfId }: { selfId: string }) {
               </label>
               <label className="full">
                 {editing.id
-                  ? `รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน, อย่างน้อย ${MIN_PASSWORD} ตัวอักษร)`
-                  : `รหัสผ่านชั่วคราว (อย่างน้อย ${MIN_PASSWORD} ตัวอักษร)`}
+                  ? `รหัสผ่านใหม่ (เว้นว่างไว้ถ้าไม่เปลี่ยน, อย่างน้อย ${MIN_PASSWORD} ตัว)`
+                  : `รหัสผ่านชั่วคราว (อย่างน้อย ${MIN_PASSWORD} ตัว)`}
                 <input
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
@@ -425,7 +423,7 @@ function Users({ selfId }: { selfId: string }) {
                   }}
                 >
                   <KeyRound size={14} aria-hidden="true" />
-                  สร้างรหัสผ่านชั่วคราว
+                  สุ่มรหัสผ่านให้
                 </button>
                 <button
                   className="button small-button"
@@ -447,14 +445,16 @@ function Users({ selfId }: { selfId: string }) {
                   onClick={copyPassword}
                 >
                   <Copy size={14} aria-hidden="true" />
-                  คัดลอก
+                  คัดลอกรหัสผ่าน
                 </button>
               </div>
               <p className="form-hint full">
-                ผู้ใช้จะถูกแจ้งให้เปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
+                {editing.id
+                  ? "ถ้าตั้งรหัสผ่านใหม่ เขาต้องเปลี่ยนรหัสผ่านอีกครั้งตอนเข้าสู่ระบบ"
+                  : "ระบบไม่ส่งอีเมลให้ กรุณาแจ้งรหัสผ่านนี้ให้เขาเอง เขาจะต้องเปลี่ยนรหัสผ่านตอนเข้าสู่ระบบครั้งแรก"}
               </p>
               <label>
-                บทบาท
+                สิทธิ์ใช้งาน
                 <select
                   value={editing.role}
                   disabled={editingSelf}
@@ -467,6 +467,7 @@ function Users({ selfId }: { selfId: string }) {
                     </option>
                   ))}
                 </select>
+                <small>{roleDescriptions[editing.role]}</small>
                 <FieldError message={fields.role} />
               </label>
               {editing.id && (
@@ -487,7 +488,7 @@ function Users({ selfId }: { selfId: string }) {
               )}
               {editingSelf && (
                 <p className="form-hint full">
-                  ไม่สามารถเปลี่ยนบทบาทหรือสถานะของบัญชีตัวเองได้
+                  เปลี่ยนสิทธิ์ใช้งานหรือสถานะของบัญชีตัวเองไม่ได้
                 </p>
               )}
             </div>
@@ -497,7 +498,13 @@ function Users({ selfId }: { selfId: string }) {
               </button>
               <button className="button primary" type="submit" disabled={pending}>
                 <Save size={16} aria-hidden="true" />
-                {pending ? "กำลังบันทึก…" : "บันทึกผู้ใช้"}
+                {pending
+                  ? editing.id
+                    ? "กำลังบันทึก…"
+                    : "กำลังสร้าง…"
+                  : editing.id
+                    ? "บันทึก"
+                    : "สร้างผู้ใช้"}
               </button>
             </div>
           </form>
@@ -514,20 +521,20 @@ function Users({ selfId }: { selfId: string }) {
           }
           message={
             action.kind === "delete"
-              ? `ลบ ${action.target.name} (${action.target.email}) ถาวร? ถ้าผู้ใช้เคยมีประวัติการใช้งานจะลบไม่ได้ ให้ปิดใช้งานไว้แทน`
+              ? `ลบ ${action.target.name} (${action.target.email}) ถาวร? ลบแล้วกู้คืนไม่ได้ ถ้าเขาเคยใช้งานระบบมาก่อนจะลบไม่ได้ ให้ปิดใช้งานแทน`
               : action.target.active
-                ? `ปิดใช้งาน ${action.target.name}? ผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`
-                : `เปิดใช้งาน ${action.target.name} อีกครั้ง?`
+                ? `ปิดใช้งาน ${action.target.name}? เขาจะเข้าสู่ระบบไม่ได้ แต่ข้อมูลและประวัติยังอยู่ กดเปิดใช้งานเมื่อไรก็กลับมาใช้ได้`
+                : `เปิดใช้งาน ${action.target.name} อีกครั้ง? เขาจะเข้าสู่ระบบได้ตามปกติ`
           }
           error={actionError}
           confirmLabel={
             action.kind === "delete"
-              ? "ลบถาวร"
+              ? "ลบผู้ใช้ถาวร"
               : action.target.active
                 ? "ปิดใช้งาน"
                 : "เปิดใช้งาน"
           }
-          pendingLabel="กำลังดำเนินการ…"
+          pendingLabel="กำลังทำรายการ…"
           pending={actionPending}
           danger={action.kind === "delete" || action.target.active}
           onConfirm={confirmAction}

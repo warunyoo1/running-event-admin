@@ -14,7 +14,7 @@ export function EventImagesPanel({ event }: { event: Pick<AdminEvent, "name" | "
   if (!groups.length) {
     return (
       <div className="modal-body">
-        <EmptyState title="ยังไม่มีรูปภาพ" description="งานนี้ยังไม่มีการอัปโหลดรูปภาพ" />
+        <EmptyState title="ยังไม่มีรูปภาพ" description="งานนี้ยังไม่มีรูป" />
       </div>
     );
   }

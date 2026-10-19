@@ -8,7 +8,7 @@ import { PROVINCES } from "@/lib/constants";
 import type { Address } from "@/lib/api/types";
 
 const HTTP_CONFLICT = 409;
-const LOCKED_MESSAGE = "ไม่สามารถแก้ไขที่อยู่ได้ในสถานะปัจจุบัน";
+const LOCKED_MESSAGE = "แก้ที่อยู่ไม่ได้แล้ว เพราะออเดอร์นี้มีเลขพัสดุ ถูกยกเลิก หรือหมดเวลาไปแล้ว";
 
 /** Inline address editor. Stays in the order modal: `onSaved` reloads the detail, `onClose` hides the form. */
 export function OrderAddressForm({

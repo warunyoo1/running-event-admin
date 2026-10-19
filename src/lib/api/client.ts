@@ -57,7 +57,7 @@ async function send(
     });
   } catch (error) {
     if (isAbortError(error)) throw error;
-    throw new ApiError(0, "NETWORK_ERROR", "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้");
+    throw new ApiError(0, "NETWORK_ERROR", "เชื่อมต่อระบบไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง");
   }
   if (res.ok) return res;
   const apiError = await toApiError(res);
@@ -88,7 +88,7 @@ export async function getPage<T>(
   signal?: AbortSignal,
 ): Promise<Paginated<T>> {
   const { data, meta } = await request<T[]>("GET", path, { query, signal });
-  if (!meta) throw new ApiError(0, "BAD_RESPONSE", "ข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง");
+  if (!meta) throw new ApiError(0, "BAD_RESPONSE", "ระบบตอบกลับผิดปกติ กรุณาลองอีกครั้ง ถ้ายังไม่หายให้แจ้งผู้ดูแลระบบ");
   return { data, meta };
 }
 

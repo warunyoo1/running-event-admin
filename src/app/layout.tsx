@@ -7,7 +7,7 @@ import "./globals.css";
 import { ToastProvider } from "@/features/admin/toast-provider";
 
 export const metadata: Metadata = {
-  description: "ระบบจัดการงานวิ่ง ผู้สมัคร และการตรวจสอบการชำระเงิน",
+  description: "ระบบจัดการงานวิ่ง ผู้สมัคร และการตรวจสลิป",
   robots: { index: false, follow: false },
 };
 

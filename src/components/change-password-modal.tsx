@@ -72,7 +72,7 @@ export function ChangePasswordModal({
             )}
           </label>
           <label className="full">
-            รหัสผ่านใหม่ (อย่างน้อย {MIN_PASSWORD} ตัวอักษร)
+            รหัสผ่านใหม่ (อย่างน้อย {MIN_PASSWORD} ตัว)
             <input
               required
               type="password"
@@ -92,7 +92,7 @@ export function ChangePasswordModal({
           </button>
           <button className="button primary" type="submit" disabled={pending}>
             <Save size={16} aria-hidden="true" />
-            {pending ? "กำลังบันทึก…" : "บันทึกรหัสผ่าน"}
+            {pending ? "กำลังบันทึก…" : "เปลี่ยนรหัสผ่าน"}
           </button>
         </div>
       </form>

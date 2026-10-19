@@ -28,6 +28,7 @@ import { isSuper } from "@/features/admin/permissions";
 import {
   categoryLabels,
   date,
+  eventStatusHints,
   money,
   number,
   statusLabels,
@@ -194,16 +195,17 @@ function ConfirmDialog({
 
 function confirmMessage({ kind, event, hasOrders }: Confirm): string {
   if (kind === "archive")
-    return `เก็บถาวรงาน «${event.name}»? งานจะถูกซ่อนจากหน้าเว็บสาธิตสมัครและรายการหลัก สามารถกู้คืนได้ภายหลัง`;
-  if (hasOrders) return "งานนี้มีออเดอร์แล้ว ลบถาวรไม่ได้";
-  return `ลบงาน «${event.name}» ถาวร? ระยะวิ่งและรูปภาพจะถูกลบ ไม่สามารถกู้คืนได้ ลบได้เฉพาะงานที่ไม่มีออเดอร์`;
+    return `ซ่อนงาน «${event.name}»? งานจะไม่แสดงบนเว็บรับสมัครและรับสมัครใหม่ไม่ได้ แต่ข้อมูลออเดอร์และรูปภาพยังอยู่ครบ กด “แสดงงานอีกครั้ง” เมื่อไรก็ได้`;
+  if (hasOrders)
+    return `งานนี้มีออเดอร์แล้ว จึงลบไม่ได้${event.archived ? "" : " ให้ซ่อนงานแทน ข้อมูลออเดอร์จะยังอยู่ครบ"}`;
+  return `ลบงาน «${event.name}» ถาวร? ระยะวิ่งและรูปภาพทั้งหมดจะหายไปและกู้คืนไม่ได้ ลบได้เฉพาะงานที่ยังไม่มีออเดอร์ ถ้าไม่แน่ใจให้เลือก “ซ่อนงาน” แทน`;
 }
 
 /** `undefined` leaves only the close button (an archived event with orders has nothing to offer). */
 function confirmLabel({ kind, event, hasOrders }: Confirm): string | undefined {
-  if (kind === "archive") return "เก็บถาวร";
-  if (!hasOrders) return "ลบถาวร";
-  return event.archived ? undefined : "เก็บถาวรแทน";
+  if (kind === "archive") return "ซ่อนงาน";
+  if (!hasOrders) return "ลบงานถาวร";
+  return event.archived ? undefined : "ซ่อนงานแทน";
 }
 
 function FieldError({ message, id }: { message?: string; id?: string }) {
@@ -327,7 +329,7 @@ function Events() {
   async function restore(event: AdminEvent) {
     try {
       await eventsApi.restoreEvent(event.id);
-      notify(`กู้คืนงาน «${event.name}» แล้ว`);
+      notify(`แสดงงาน «${event.name}» อีกครั้งแล้ว`);
       afterChange();
     } catch (failure) {
       notify(errorMessage(failure));
@@ -343,9 +345,9 @@ function Events() {
         await eventsApi.deleteEvent(event.id);
         notify(`ลบงาน «${event.name}» แล้ว`);
       } else {
-        // Archive, or "archive instead" after a refused delete.
+        // Archive ("hide"), or "hide instead" after a refused delete.
         await eventsApi.archiveEvent(event.id);
-        notify(`เก็บถาวรงาน «${event.name}» แล้ว`);
+        notify(`ซ่อนงาน «${event.name}» แล้ว`);
       }
       setConfirm(null);
       afterChange();
@@ -375,14 +377,14 @@ function Events() {
       const body = eventsApi.toEventBody(editing.form);
       if (editing.id) {
         await eventsApi.updateEvent(editing.id, body);
-        notify("บันทึกงานวิ่งแล้ว");
+        notify("บันทึกการแก้ไขแล้ว");
         setEditing(null);
       } else {
         // Keep the dialog open on the new event so images can be added right away.
         const created = await eventsApi.createEvent(body);
         const pendingFiles = staged.items;
         if (pendingFiles.length === 0) {
-          notify("สร้างงานวิ่งแล้ว เพิ่มรูปภาพได้เลย");
+          notify("สร้างงานวิ่งแล้ว เพิ่มรูปภาพต่อได้เลย");
         } else {
           const result = await uploadFiles(created.id, pendingFiles, (n, total) =>
             setUploadStatus(`กำลังอัปโหลดรูป ${n} จาก ${total} ไฟล์…`),
@@ -391,8 +393,8 @@ function Events() {
           setUploadFailures(result.failures);
           notify(
             result.failures.length === 0
-              ? `สร้างงานวิ่งและอัปโหลดรูป ${result.done} รูปแล้ว`
-              : `สร้างงานวิ่งแล้ว แต่อัปโหลดรูปไม่สำเร็จ ${result.failures.length} ไฟล์ ลองเพิ่มใหม่ในส่วนรูปภาพ`,
+              ? `สร้างงานวิ่งและเพิ่มรูป ${result.done} รูปแล้ว`
+              : `สร้างงานวิ่งแล้ว แต่เพิ่มรูปไม่สำเร็จ ${result.failures.length} ไฟล์ ลองเพิ่มใหม่ในส่วนรูปภาพ`,
           );
           staged.clear();
         }
@@ -418,12 +420,12 @@ function Events() {
       <PageHeading
         title="จัดการงานวิ่ง"
         scope="global"
-        description="ดูงานวิ่งทั้งหมด สร้างงาน และตั้งค่าการรับสมัครในที่เดียว"
+        description="สร้างงานวิ่ง แก้ไขรายละเอียด ระยะวิ่ง ราคา และรูปภาพ"
         action={
           canEdit && (
             <button className="button primary" onClick={() => open(newEditing())}>
               <Plus size={17} aria-hidden="true" />
-              สร้างงานวิ่ง
+              สร้างงานวิ่งใหม่
             </button>
           )
         }
@@ -449,13 +451,13 @@ function Events() {
           </select>
         </label>
         <label>
-          <span className="sr-only">การแสดงผล</span>
+          <span className="sr-only">งานที่แสดง</span>
           <select
             value={archived ? "archived" : "active"}
             onChange={(e) => changeFilter(() => setArchived(e.target.value === "archived"))}
           >
-            <option value="active">ใช้งานอยู่</option>
-            <option value="archived">เก็บถาวร</option>
+            <option value="active">งานที่แสดงอยู่</option>
+            <option value="archived">งานที่ซ่อนไว้</option>
           </select>
         </label>
         <span className="result-count">{data ? `${data.meta.total} งานวิ่ง` : ""}</span>
@@ -479,7 +481,7 @@ function Events() {
                         {event.archived && (
                           <span className="badge badge-closed">
                             <span aria-hidden="true" />
-                            เก็บถาวร
+                            ซ่อนอยู่
                           </span>
                         )}
                         <span>{event.races.map((race) => race.name).join(" / ")}</span>
@@ -497,7 +499,7 @@ function Events() {
                         <div>
                           <span>
                             <Users size={15} aria-hidden="true" />
-                            ที่นั่งที่จอง
+                            จองแล้ว
                           </span>
                           <strong>
                             {number(count)}
@@ -507,18 +509,18 @@ function Events() {
                         <progress
                           value={count}
                           max={Math.max(1, quota)}
-                          aria-label={`ที่นั่งที่จอง ${count} จากโควตา ${quota} คน`}
+                          aria-label={`จองแล้ว ${count} จากจำนวนที่รับ ${quota} คน`}
                         />
                       </div>
                       <div className="event-card-footer">
-                        <span>เริ่มต้น {money(lowest)}</span>
+                        <span>ราคาเริ่มต้น {money(lowest)}</span>
                         <div className="event-card-actions">
                           <button className="text-link" onClick={() => setViewing(event)}>
                             ดูรูปภาพ
                           </button>
                           {canEdit && !event.archived && (
                             <button className="text-link" onClick={() => open(editingFrom(event))}>
-                              จัดการงาน
+                              แก้ไขงาน
                               <ArrowUpRight size={16} aria-hidden="true" />
                             </button>
                           )}
@@ -532,7 +534,7 @@ function Events() {
                               onClick={() => restore(event)}
                             >
                               <ArchiveRestore size={15} aria-hidden="true" />
-                              กู้คืน
+                              แสดงงานอีกครั้ง
                             </button>
                           ) : (
                             <button
@@ -540,7 +542,7 @@ function Events() {
                               onClick={() => ask("archive", event)}
                             >
                               <Archive size={15} aria-hidden="true" />
-                              เก็บถาวร
+                              ซ่อนงาน
                             </button>
                           )}
                           <button
@@ -548,7 +550,7 @@ function Events() {
                             onClick={() => ask("delete", event)}
                           >
                             <Trash2 size={15} aria-hidden="true" />
-                            ลบ
+                            ลบงาน
                           </button>
                         </div>
                       )}
@@ -564,11 +566,11 @@ function Events() {
         ))}
       {confirm && (
         <ConfirmDialog
-          title={confirm.kind === "archive" ? "เก็บถาวรงานวิ่ง" : "ลบงานวิ่งถาวร"}
+          title={confirm.kind === "archive" ? "ซ่อนงานวิ่ง" : "ลบงานวิ่งถาวร"}
           message={confirmMessage(confirm)}
           error={confirmError}
           confirmLabel={confirmLabel(confirm)}
-          pendingLabel="กำลังดำเนินการ…"
+          pendingLabel="กำลังทำรายการ…"
           pending={confirmPending}
           onConfirm={runConfirm}
           onClose={closeConfirm}
@@ -581,7 +583,7 @@ function Events() {
       )}
       {editing && form && (
         <Modal
-          title={editing.id ? "ตั้งค่างานวิ่ง" : "สร้างงานวิ่ง"}
+          title={editing.id ? "แก้ไขงานวิ่ง" : "สร้างงานวิ่งใหม่"}
           onClose={close}
           wide
         >
@@ -605,7 +607,7 @@ function Events() {
                 <FieldError message={fields.name} />
               </label>
               <label className="full">
-                ลิงก์งานวิ่ง (slug)
+                ลิงก์ของงาน (ส่วนท้ายของ URL)
                 <input
                   required
                   maxLength={SLUG_MAX}
@@ -620,15 +622,15 @@ function Events() {
                   }}
                 />
                 <small id="slug-hint">
-                  ใช้ตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีดกลาง
+                  ใช้ได้เฉพาะตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีดกลาง (-)
                   {editing.id
-                    ? " · คำเตือน: การเปลี่ยน slug จะทำให้ลิงก์สาธารณะของงานนี้เปลี่ยน ลิงก์เดิมจะใช้ไม่ได้"
+                    ? " · ระวัง: ถ้าเปลี่ยนลิงก์ ลิงก์เดิมที่แชร์ไปแล้วจะเปิดไม่ได้"
                     : slugTouched
                       ? ""
-                      : " · สร้างจากชื่องานอัตโนมัติ แก้ไขเองได้"}
+                      : " · ระบบสร้างให้จากชื่องาน แก้เองได้"}
                   {!editing.id &&
                     isThaiFallback(form.name) &&
-                    " · ชื่อภาษาไทยต้องตั้ง slug เป็นภาษาอังกฤษ"}
+                    " · ชื่องานเป็นภาษาไทย กรุณาพิมพ์ลิงก์เป็นภาษาอังกฤษเอง"}
                 </small>
                 <FieldError message={fields.slug} id="slug-error" />
                 {slugSuggestion && fields.slug && (
@@ -642,12 +644,12 @@ function Events() {
                       setFields((f) => ({ ...f, slug: "" }));
                     }}
                   >
-                    ลองใช้ {slugSuggestion}
+                    ใช้ {slugSuggestion} แทน
                   </button>
                 )}
               </label>
               <label className="full">
-                คำโปรย
+                คำโปรย (ข้อความสั้นๆ ใต้ชื่องาน)
                 <input
                   maxLength={SUBTITLE_MAX}
                   value={form.subtitle}
@@ -680,7 +682,7 @@ function Events() {
               </label>
               <div className="field-clearable">
                 <label>
-                  ปิดรับสมัคร
+                  วันปิดรับสมัคร
                   <input
                     type="date"
                     value={form.registrationEnds}
@@ -700,7 +702,7 @@ function Events() {
                 )}
               </div>
               <label>
-                สถานะ
+                สถานะงาน
                 <select
                   value={form.status}
                   aria-invalid={Boolean(fields.status)}
@@ -712,10 +714,11 @@ function Events() {
                     </option>
                   ))}
                 </select>
+                <small>{eventStatusHints[form.status]}</small>
                 <FieldError message={fields.status} />
               </label>
               <label>
-                ประเภท
+                ประเภทงาน
                 <select
                   value={form.category}
                   aria-invalid={Boolean(fields.category)}
@@ -791,10 +794,10 @@ function Events() {
                 <FieldError message={fields.refundPolicy} />
               </label>
               <fieldset className="full race-fields">
-                <legend>ระยะและราคา</legend>
+                <legend>ระยะวิ่งและราคา</legend>
                 {original && original.orderCount > 0 && (
                   <p className="muted">
-                    งานนี้มีออเดอร์แล้ว การแก้ไขชื่อ ราคา หรือโควตาของระยะอาจถูกปฏิเสธ
+                    งานนี้มีออเดอร์แล้ว การแก้ชื่อ ราคา หรือจำนวนที่รับของระยะวิ่งอาจทำไม่ได้
                   </p>
                 )}
                 <FieldError message={fields.races} />
@@ -802,7 +805,7 @@ function Events() {
                   return (
                     <div className="race-field-row" key={race.id ?? `new-${index}`}>
                       <label>
-                        ระยะ
+                        ชื่อระยะวิ่ง
                         <input
                           required
                           maxLength={RACE_NAME_MAX}
@@ -826,7 +829,7 @@ function Events() {
                         <FieldError message={fields[`races.${index}.price`]} />
                       </label>
                       <label>
-                        โควตา (คน)
+                        จำนวนที่รับ (คน)
                         <input
                           type="number"
                           min="1"
@@ -868,7 +871,7 @@ function Events() {
                           }
                         >
                           <Trash2 size={15} aria-hidden="true" />
-                          ลบระยะ
+                          ลบระยะวิ่งนี้
                         </button>
                       )}
                     </div>
@@ -881,7 +884,7 @@ function Events() {
                     onClick={() => setForm({ races: [...form.races, emptyRace()] })}
                   >
                     <Plus size={15} aria-hidden="true" />
-                    เพิ่มระยะ
+                    เพิ่มระยะวิ่ง
                   </button>
                 )}
               </fieldset>
@@ -917,7 +920,13 @@ function Events() {
               </button>
               <button className="button primary" type="submit" disabled={pending}>
                 <Save size={16} aria-hidden="true" />
-                {pending ? "กำลังบันทึก…" : "บันทึกงานวิ่ง"}
+                {pending
+                  ? editing.id
+                    ? "กำลังบันทึก…"
+                    : "กำลังสร้าง…"
+                  : editing.id
+                    ? "บันทึก"
+                    : "สร้างงานวิ่ง"}
               </button>
             </div>
           </form>

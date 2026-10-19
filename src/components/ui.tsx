@@ -60,10 +60,10 @@ export function PageHeading({
             className={`heading-event ${scope === "global" ? "global-context" : ""}`}
           >
             {scope === "global"
-              ? "ส่วนกลาง · ไม่ขึ้นกับงานที่เลือก"
+              ? "ทุกงาน · ไม่ขึ้นกับงานที่เลือก"
               : selectedEvent
                 ? `ของ ${selectedEvent.name}`
-                : "รวมข้อมูลทุกงานวิ่ง"}
+                : "รวมทุกงานวิ่ง"}
           </span>
         </h1>
         <p>{description}</p>

@@ -57,7 +57,7 @@ export default function SlipsPage() {
     <>
       <PageHeading
         title="ตรวจสลิป"
-        description="ตรวจสอบหลักฐานและยืนยันสิทธิ์ผู้สมัคร เรียงจากออเดอร์เก่าไปใหม่"
+        description="ดูสลิปที่ผู้สมัครส่งมา แล้วอนุมัติหรือปฏิเสธ เรียงจากเก่าสุดไปใหม่สุด"
         action={
           <button
             className="button primary"
@@ -65,7 +65,7 @@ export default function SlipsPage() {
             onClick={() => next && setSelected(next)}
           >
             <ScanLine size={17} aria-hidden="true" />
-            ตรวจรายการถัดไป
+            ตรวจสลิปถัดไป
             <ArrowRight size={16} aria-hidden="true" />
           </button>
         }
@@ -74,7 +74,7 @@ export default function SlipsPage() {
         <StatCard
           title="สลิปรอตรวจ"
           value={counts ? number(counts.pendingReview) : "–"}
-          note="รายการที่ยังไม่ได้ตรวจสอบ"
+          note="ยังไม่ได้ตรวจ"
           icon={ScanLine}
           accent
         />
@@ -85,9 +85,9 @@ export default function SlipsPage() {
           icon={CheckCheck}
         />
         <StatCard
-          title="ยอดชำระเงินแล้ว"
+          title="ยอดเงินที่รับแล้ว"
           value={counts ? money(counts.paidRevenue) : "–"}
-          note="รวมจากออเดอร์ที่ยืนยันแล้ว"
+          note="รวมจากออเดอร์ที่อนุมัติสลิปแล้ว"
           icon={CircleDollarSign}
         />
       </div>
@@ -95,7 +95,7 @@ export default function SlipsPage() {
         <div
           className="tabs"
           role="tablist"
-          aria-label="คิวตรวจสลิป"
+          aria-label="รายการสลิป"
           onKeyDown={handleTabKeys}
         >
           <button
@@ -106,7 +106,7 @@ export default function SlipsPage() {
             aria-controls="slips-panel"
             onClick={() => changeTab("waiting")}
           >
-            รอตรวจสอบ
+            รอตรวจ
             {counts && <span>{counts.pendingReview}</span>}
           </button>
           <button
@@ -131,12 +131,12 @@ export default function SlipsPage() {
                   <table className="table-mobile-cards" role="table">
                     <thead>
                       <tr>
-                        <th>ออเดอร์ / ผู้ติดต่อ</th>
+                        <th>ผู้ติดต่อ / เลขออเดอร์</th>
                         <th className="table-secondary">งานวิ่ง</th>
                         <th>ยอดที่ต้องชำระ</th>
                         <th className="table-secondary">เวลาส่งสลิป</th>
                         <th>สถานะ</th>
-                        <th>การตรวจสอบ</th>
+                        <th>จัดการ</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -191,8 +191,8 @@ export default function SlipsPage() {
                 }
                 description={
                   tab === "waiting"
-                    ? "เมื่อมีผู้สมัครส่งหลักฐาน รายการจะปรากฏที่นี่"
-                    : "รายการที่ตรวจแล้วจะปรากฏที่นี่"
+                    ? "เมื่อผู้สมัครส่งสลิปเข้ามา รายการจะแสดงที่นี่"
+                    : "สลิปที่ตรวจแล้วจะแสดงที่นี่"
                 }
               />
             ))}

@@ -76,14 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       <main className="context-loading">
         <EmptyState title="โหลดข้อมูลผู้ใช้ไม่สำเร็จ" description={error} />
         <button className="button primary" onClick={() => setAttempt((value) => value + 1)}>
-          ลองใหม่
+          ลองอีกครั้ง
         </button>
       </main>
     );
   if (!user)
     return (
       <p className="context-loading" role="status">
-        กำลังโหลดพื้นที่ทำงาน…
+        กำลังโหลด…
       </p>
     );
   return <Context.Provider value={{ user, logout, refresh }}>{children}</Context.Provider>;

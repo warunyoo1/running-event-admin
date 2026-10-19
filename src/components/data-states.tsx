@@ -22,7 +22,7 @@ export function ErrorState({
     <div className="form-error data-error" role="alert">
       <span>{message}</span>
       <button className="button small-button" type="button" onClick={onRetry}>
-        ลองใหม่
+        ลองอีกครั้ง
       </button>
     </div>
   );

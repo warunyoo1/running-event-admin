@@ -7,7 +7,7 @@ import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useDebounced } from "@/features/admin/use-debounced";
 import { useToast } from "@/features/admin/toast-provider";
-import { date, money, statusLabels } from "@/features/admin/format";
+import { date, exportLimitNotice, money, statusLabels } from "@/features/admin/format";
 import { OrderDetail } from "@/features/admin/order-detail";
 import { exportsApi, ordersApi } from "@/lib/api";
 import { errorMessage } from "@/lib/api/errors";
@@ -57,7 +57,7 @@ function Orders() {
     try {
       const { rows: count } = await exportsApi.exportOrdersCsv(filters);
       if (count >= EXPORT_LIMIT) {
-        notify(`ส่งออกได้สูงสุด ${EXPORT_LIMIT.toLocaleString("th-TH")} รายการ ข้อมูลอาจไม่ครบ`);
+        notify(exportLimitNotice(EXPORT_LIMIT));
       }
     } catch (failure) {
       notify(errorMessage(failure));
@@ -73,7 +73,7 @@ function Orders() {
     <>
       <PageHeading
         title="ออเดอร์"
-        description="ค้นหาและติดตามการสมัคร ตั้งแต่สร้างออเดอร์จนถึงชำระเงิน"
+        description="ออเดอร์คือการสมัคร 1 ครั้ง (อาจมีผู้สมัครหลายคน) ค้นหาและดูสถานะได้ที่นี่"
         action={
           <button
             className="button"
@@ -81,7 +81,7 @@ function Orders() {
             disabled={!rows.length || exporting}
           >
             <Download size={16} aria-hidden="true" />
-            ส่งออก CSV
+            ดาวน์โหลด CSV
           </button>
         }
       />
@@ -139,7 +139,7 @@ function Orders() {
                 <table className="table-mobile-cards" role="table">
                   <thead>
                     <tr>
-                      <th>หมายเลขออเดอร์</th>
+                      <th>เลขออเดอร์</th>
                       <th className="table-secondary">ผู้ติดต่อ</th>
                       <th className="table-secondary">งานวิ่ง</th>
                       <th className="numeric">ยอดชำระ</th>
@@ -164,7 +164,7 @@ function Orders() {
                             {o.contactName}
                           </span>
                           <small className="cell-sub">
-                            {o.participantCount} ผู้สมัคร
+                            {o.participantCount} คน
                           </small>
                         </td>
                         <td className="table-secondary">

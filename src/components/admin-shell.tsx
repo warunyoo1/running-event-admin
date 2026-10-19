@@ -26,7 +26,7 @@ import { useScope } from "@/features/admin/scope-provider";
 import { useToast } from "@/features/admin/toast-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { isSuper } from "@/features/admin/permissions";
-import { roleLabels } from "@/features/admin/format";
+import { roleDescriptions, roleLabels } from "@/features/admin/format";
 import { dashboardApi } from "@/lib/api";
 import { errorMessage } from "@/lib/api/errors";
 import { ALL_EVENTS, MUST_CHANGE_PASSWORD_SHOWN_KEY } from "@/lib/constants";
@@ -48,7 +48,7 @@ const navigation: NavItem[] = [
   { href: "/participants", title: "ผู้สมัคร", icon: Users, scope: "event" },
   {
     href: "/shipping",
-    title: "รับอุปกรณ์และจัดส่ง",
+    title: "รับชุดวิ่งและจัดส่ง",
     icon: Truck,
     scope: "event",
   },
@@ -191,7 +191,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {href === "/slips" && waiting > 0 && (
             <span
               className="nav-count"
-              aria-label={`${waiting} รายการรอตรวจในงานที่เลือก`}
+              aria-label={`${waiting} ออเดอร์รอตรวจสลิปในงานที่เลือก`}
             >
               {waiting}
             </span>
@@ -203,7 +203,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="admin-app">
       <title>{`${title} | RunOps`}</title>
       <a className="skip-link" href="#main">
-        ข้ามไปยังเนื้อหา
+        ข้ามไปที่เนื้อหา
       </a>
       {menuOpen && (
         <button
@@ -237,7 +237,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </button>
         <div className="workspace-label">
           <label className="workspace-caption" htmlFor="event-scope">
-            เลือกงานที่ต้องการจัดการ
+            เลือกงานวิ่ง
           </label>
           <div className="workspace-selector">
             <Flag size={17} aria-hidden="true" />
@@ -261,18 +261,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
           <p id="event-scope-hint" className="workspace-hint">
             {eventId === ALL_EVENTS
-              ? "ดูข้อมูลรวมทุกงานวิ่ง"
-              : "ดูข้อมูลเฉพาะงานที่เลือก"}
+              ? "แสดงข้อมูลรวมของทุกงานวิ่ง"
+              : "แสดงข้อมูลเฉพาะงานที่เลือก"}
           </p>
         </div>
         <p className="nav-label" id="event-navigation-label">
-          ข้อมูลตามงานที่เลือก
+          ข้อมูลของงานที่เลือก
         </p>
         <nav aria-labelledby="event-navigation-label">
           {renderNavigation("event")}
         </nav>
         <p className="nav-label nav-section-label" id="global-navigation-label">
-          ส่วนกลาง · ทุกงาน
+          จัดการระบบ · ทุกงาน
         </p>
         <nav aria-labelledby="global-navigation-label">
           {renderNavigation("global")}
@@ -283,7 +283,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             onClick={() => setHelpOpen(true)}
           >
             <CircleHelp size={19} aria-hidden="true" />
-            คำแนะนำการใช้งาน
+            วิธีใช้งาน
           </button>
           <div className="profile">
             <span className="avatar">{initials}</span>
@@ -323,7 +323,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <Menu size={22} />
             </button>
             <span className="breadcrumb-home">
-              {isGlobal ? "ส่วนกลาง" : "ข้อมูลตามงานที่เลือก"}
+              {isGlobal ? "จัดการระบบ" : "ข้อมูลของงานที่เลือก"}
             </span>
             <ChevronRight size={15} aria-hidden="true" />
             <strong>{title}</strong>
@@ -333,7 +333,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               className="scope-indicator"
               title={
                 isGlobal
-                  ? "หน้านี้แสดงข้อมูลส่วนกลาง ไม่ขึ้นกับงานที่เลือก"
+                  ? "หน้านี้แสดงข้อมูลของทุกงาน ไม่ขึ้นกับงานที่เลือกในเมนู"
                   : scopeLabel
               }
             >
@@ -342,7 +342,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               ) : (
                 <Flag size={16} aria-hidden="true" />
               )}
-              <span>{isGlobal ? "ข้อมูลส่วนกลาง" : scopeLabel}</span>
+              <span>{isGlobal ? "ข้อมูลทุกงาน" : scopeLabel}</span>
             </span>
             <span className="avatar small" aria-label={user.name}>
               {initials}
@@ -350,7 +350,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main id="main" tabIndex={-1}>
-          {ready ? children : <p className="context-loading" role="status">กำลังโหลดพื้นที่ทำงาน…</p>}
+          {ready ? children : <p className="context-loading" role="status">กำลังโหลด…</p>}
         </main>
         <footer className="page-footer">
           <span>
@@ -366,35 +366,33 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       )}
       {passwordNudge && !passwordOpen && (
         <ChangePasswordModal
-          notice="บัญชีนี้ใช้รหัสผ่านชั่วคราว กรุณาเปลี่ยนรหัสผ่านใหม่"
+          notice="บัญชีนี้ยังใช้รหัสผ่านชั่วคราว กรุณาตั้งรหัสผ่านใหม่ของคุณเอง"
           onClose={() => setPasswordNudge(false)}
           onChanged={refresh}
         />
       )}
       {helpOpen && (
         <Modal
-          title="คำแนะนำการใช้งาน RunOps"
+          title="วิธีใช้งาน RunOps"
           onClose={() => setHelpOpen(false)}
         >
           <div className="modal-body prose">
             <p>
-              เลือกงานวิ่งที่ sidebar เพื่อดูภาพรวม ออเดอร์ สลิป ผู้สมัคร
-              การจัดส่ง และรายงานของงานนั้น
-              เมนูส่วนกลางใช้จัดการงานวิ่งทั้งหมดและผู้ใช้
-              โดยไม่ขึ้นกับงานที่เลือก
+              เลือกงานวิ่งจากเมนูด้านซ้าย แล้วดูภาพรวม ออเดอร์ สลิป ผู้สมัคร
+              การรับชุดวิ่ง และรายงานของงานนั้นได้ ส่วน “จัดการระบบ”
+              ใช้กับทุกงาน ไม่ขึ้นกับงานที่เลือก
             </p>
             <p>
-              สิทธิ์การใช้งานขึ้นกับบทบาทของบัญชี
-              ผู้ดูข้อมูลไม่สามารถแก้ไขข้อมูลได้
-              และเมนูผู้ใช้และสิทธิ์ กับประวัติการใช้งาน เปิดให้เฉพาะผู้ดูแลระบบ
+              สิทธิ์ของคุณคือ “{roleLabels[user.role]}”: {roleDescriptions[user.role]}
             </p>
+            <p>เมนูผู้ใช้และสิทธิ์ กับประวัติการใช้งาน เปิดให้เฉพาะผู้ดูแลระบบ</p>
           </div>
           <div className="modal-actions">
             <button
               className="button primary"
               onClick={() => setHelpOpen(false)}
             >
-              เริ่มใช้งาน
+              เข้าใจแล้ว
             </button>
           </div>
         </Modal>

@@ -18,7 +18,7 @@ import {
 import { useScope } from "@/features/admin/scope-provider";
 import { useAsync } from "@/features/admin/use-async";
 import { useToast } from "@/features/admin/toast-provider";
-import { date, money, number } from "@/features/admin/format";
+import { date, money, number, statusLabels } from "@/features/admin/format";
 import { dashboardApi, exportsApi, ordersApi } from "@/lib/api";
 import { errorMessage } from "@/lib/api/errors";
 import type { OrderStatus } from "@/lib/api/types";
@@ -75,8 +75,8 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeading
-        title="ภาพรวมการจัดงาน"
-        description="ทุกความเคลื่อนไหวของงานวิ่ง ในที่เดียว"
+        title="ภาพรวม"
+        description="สรุปจำนวนผู้สมัคร ยอดเงิน และสลิปที่รอตรวจ"
         action={
           <button
             className="button"
@@ -84,7 +84,7 @@ export default function DashboardPage() {
             onClick={exportOverview}
           >
             <Download size={16} aria-hidden="true" />
-            ส่งออกรายงาน
+            ดาวน์โหลดสรุป (CSV)
           </button>
         }
       />
@@ -101,13 +101,13 @@ export default function DashboardPage() {
             <div>
               <strong>
                 {data.pendingReview > 0
-                  ? `มี ${number(data.pendingReview)} สลิปรอการตรวจสอบ`
-                  : "ตรวจสลิปครบแล้ว พร้อมสำหรับก้าวต่อไป"}
+                  ? `มี ${number(data.pendingReview)} ออเดอร์รอตรวจสลิป`
+                  : "ตรวจสลิปครบแล้ว ไม่มีรายการค้าง"}
               </strong>
               <p>
                 {data.pendingReview > 0
-                  ? "ตรวจสอบเพื่อยืนยันสิทธิ์ให้ผู้สมัคร"
-                  : "ติดตามจำนวนผู้สมัครและเตรียมอุปกรณ์สำหรับงานวิ่งได้เลย"}
+                  ? "ตรวจสลิปแล้วกดอนุมัติ ผู้สมัครจึงจะได้สิทธิ์เข้าร่วมงาน"
+                  : "ดูจำนวนผู้สมัครและเตรียมชุดวิ่งได้เลย"}
               </p>
             </div>
             <Link className="button primary" href="/slips">
@@ -117,22 +117,22 @@ export default function DashboardPage() {
           </div>
           <div className="stats-grid">
             <StatCard
-              title="ยอดชำระเงินแล้ว"
+              title="ยอดเงินที่รับแล้ว"
               value={money(data.paidRevenue)}
-              note={`${number(data.orders.paid)} ออเดอร์ที่ยืนยันแล้ว`}
+              note={`จาก ${number(data.orders.paid)} ออเดอร์ที่ชำระเงินแล้ว`}
               icon={CircleDollarSign}
               accent
             />
             <StatCard
-              title="ที่นั่งที่จอง"
+              title="จองแล้ว (คน)"
               value={number(data.participants)}
-              note="ไม่รวมออเดอร์ยกเลิกและหมดอายุ"
+              note="นับรวมคนที่ยังไม่จ่ายเงิน ไม่นับออเดอร์ที่ยกเลิกหรือหมดเวลา"
               icon={Users}
             />
             <StatCard
-              title="สลิปรอตรวจสอบ"
+              title="สลิปรอตรวจ"
               value={number(data.pendingReview)}
-              note="รอเจ้าหน้าที่ยืนยันการชำระเงิน"
+              note="รอเจ้าหน้าที่ตรวจและอนุมัติ"
               icon={Clock3}
             />
             <StatCard
@@ -140,7 +140,7 @@ export default function DashboardPage() {
               value={number(
                 visibleEvents.filter((event) => event.status === "open").length,
               )}
-              note={`จากทั้งหมด ${visibleEvents.length} งานวิ่ง`}
+              note={`จากทั้งหมด ${visibleEvents.length} งาน`}
               icon={Flag}
             />
           </div>
@@ -148,8 +148,8 @@ export default function DashboardPage() {
             <section className="panel chart-panel">
               <div className="panel-heading">
                 <div>
-                  <h2>ที่นั่งตามระยะ</h2>
-                  <p>จำนวนที่จองเทียบกับโควตาของแต่ละระยะ</p>
+                  <h2>ที่นั่งแต่ละระยะวิ่ง</h2>
+                  <p>จองแล้วเทียบกับจำนวนที่รับ</p>
                 </div>
               </div>
               {data.races.length ? (
@@ -158,10 +158,10 @@ export default function DashboardPage() {
                     <thead>
                       <tr>
                         <th>งานวิ่ง</th>
-                        <th>ระยะ</th>
-                        <th className="numeric">ที่นั่งที่จอง</th>
-                        <th className="numeric">โควตา</th>
-                        <th className="numeric">คงเหลือ</th>
+                        <th>ระยะวิ่ง</th>
+                        <th className="numeric">จองแล้ว</th>
+                        <th className="numeric">จำนวนที่รับ</th>
+                        <th className="numeric">ที่ว่าง</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -190,8 +190,8 @@ export default function DashboardPage() {
             <section className="panel payment-summary">
               <div className="panel-heading">
                 <div>
-                  <h2>สถานะการชำระเงิน</h2>
-                  <p>ติดตามออเดอร์ในแต่ละขั้นตอน</p>
+                  <h2>สถานะออเดอร์</h2>
+                  <p>ออเดอร์อยู่ขั้นไหนบ้าง</p>
                 </div>
                 <ArrowUpRight size={18} aria-hidden="true" />
               </div>
@@ -214,19 +214,19 @@ export default function DashboardPage() {
               <div className="payment-rows">
                 {[
                   {
-                    label: "ชำระเงินแล้ว",
+                    label: statusLabels.paid,
                     count: data.orders.paid,
                     className: "green",
                     icon: Check,
                   },
                   {
-                    label: "รอตรวจสลิป",
+                    label: statusLabels.slip_uploaded,
                     count: data.orders.slip_uploaded,
                     className: "orange",
                     icon: ScanLine,
                   },
                   {
-                    label: "รอชำระเงิน",
+                    label: statusLabels.pending,
                     count: data.orders.pending,
                     className: "blue",
                     icon: Clock3,
@@ -253,7 +253,7 @@ export default function DashboardPage() {
         <div className="panel-heading">
           <div>
             <h2>ออเดอร์ล่าสุด</h2>
-            <p>ติดตามการสมัครและสถานะการชำระเงิน</p>
+            <p>การสมัครที่เพิ่งเข้ามา และสถานะของแต่ละออเดอร์</p>
           </div>
           <Link className="text-link" href="/orders">
             ดูทั้งหมด
@@ -270,7 +270,7 @@ export default function DashboardPage() {
               <table className="table-mobile-cards" role="table">
                 <thead>
                   <tr>
-                    <th>หมายเลขออเดอร์</th>
+                    <th>เลขออเดอร์</th>
                     <th className="table-secondary">ผู้ติดต่อ</th>
                     <th className="table-secondary">งานวิ่ง</th>
                     <th className="numeric">ยอดชำระ</th>
@@ -295,7 +295,7 @@ export default function DashboardPage() {
                       <td className="table-secondary">
                         <span className="person-name">{order.contactName}</span>
                         <small className="cell-sub">
-                          {order.participantCount} ผู้สมัคร
+                          {order.participantCount} คน
                         </small>
                       </td>
                       <td className="table-secondary table-event">

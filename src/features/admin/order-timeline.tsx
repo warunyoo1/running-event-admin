@@ -31,7 +31,7 @@ const icons: Record<TimelineKind, LucideIcon> = {
 export function OrderTimeline({ entries }: { entries: OrderTimelineEntry[] }) {
   return (
     <section className="order-section" aria-labelledby="order-timeline-title">
-      <h3 id="order-timeline-title">ไทม์ไลน์</h3>
+      <h3 id="order-timeline-title">ประวัติของออเดอร์</h3>
       <ol className="order-timeline">
         {entries.map((entry) => {
           const Icon = icons[entry.kind];
