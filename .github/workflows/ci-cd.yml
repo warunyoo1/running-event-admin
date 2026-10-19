@@ -69,7 +69,7 @@ jobs:
         with:
           context: .
           build-args: |
-            API_PROXY_TARGET=${{ vars.API_PROXY_TARGET }}
+            API_PROXY_TARGET=${{ vars.API_PROXY_TARGET || secrets.API_PROXY_TARGET }}
           file: ./Dockerfile
           push: true
           tags: |
