@@ -37,9 +37,11 @@ export type EventForm = {
   contactPhones: string[];
   websiteUrl: string;
   locationUrl: string;
+  shirtPickupUrl: string;
   date: string;
   venue: string;
   startPoint: string;
+  shirtPickupPoint: string;
   province: string;
   category: EventCategory | "";
   theme: EventTheme | "";
@@ -48,7 +50,7 @@ export type EventForm = {
   registrationEnds: string;
   organizer: string;
   refundPolicy: string;
-  races: { id?: string; name: string; price: string; quota: string; start: string; prizes: { rank: string; amount: string; trophy: boolean }[] }[];
+  races: { id?: string; name: string; price: string; quota: string; unlimitedQuota: boolean; start: string; benefits: string[]; extraDetails: string; prizes: { rank: string; amount: string; trophy: boolean }[] }[];
 };
 
 /**
@@ -65,10 +67,12 @@ export function toEventBody(form: EventForm): EventBody {
     description: form.description.trim(),
     websiteUrl: form.websiteUrl.trim(),
     locationUrl: form.locationUrl.trim(),
+    shirtPickupUrl: form.shirtPickupUrl.trim(),
     contactPhones: form.contactPhones.map((phone) => phone.trim()).filter(Boolean),
     date: form.date,
     venue: form.venue.trim(),
     startPoint: form.startPoint.trim(),
+    shirtPickupPoint: form.shirtPickupPoint.trim(),
     province: form.province.trim(),
     status: form.status,
     organizer: form.organizer.trim(),
@@ -77,8 +81,11 @@ export function toEventBody(form: EventForm): EventBody {
       ...(race.id ? { id: race.id } : {}),
       name: race.name.trim(),
       price: Number(race.price),
-      quota: Number(race.quota),
+      quota: race.unlimitedQuota ? 1 : Number(race.quota),
+      unlimitedQuota: race.unlimitedQuota,
       start: race.start || null,
+      benefits: race.benefits.map((value) => value.trim()).filter(Boolean),
+      extraDetails: race.extraDetails.trim(),
       prizes: race.prizes.map((prize) => ({ rank: Number(prize.rank), amount: Number(prize.amount), trophy: prize.trophy })),
     })),
     category: form.category || null,

@@ -181,9 +181,9 @@ export default function DashboardPage() {
                           <td className="numeric strong">
                             {number(race.reserved)}
                           </td>
-                          <td className="numeric muted">{number(race.quota)}</td>
+                          <td className="numeric muted">{race.unlimitedQuota ? "ไม่จำกัด" : number(race.quota)}</td>
                           <td className="numeric muted">
-                            {number(race.remaining)}
+                            {race.unlimitedQuota ? "ไม่จำกัด" : number(race.remaining)}
                           </td>
                         </tr>
                       ))}

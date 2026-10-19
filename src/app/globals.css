@@ -1601,6 +1601,16 @@ input[type="checkbox"] {
 .event-contact-phone-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; gap: 12px; margin-top: 12px; }
 .event-contact-phone-row > button { margin-top: 27px; min-height: 44px; }
 .event-contact-phones > p { font-size: 13px; }
+.race-benefits-editor { grid-column: 1 / -1; padding-top: 16px; border-top: 1px solid var(--line); margin-top: 8px; }
+.race-benefit-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.race-benefits-editor .benefits-help { color: var(--muted); font-size: 13px; margin: -4px 0 16px; }
+.race-benefit-presets .benefit-choice { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; min-height: 48px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-size: 13px; }
+.race-benefit-presets .benefit-choice:has(:checked) { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-hover); }
+.race-benefit-presets .benefit-choice input { width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; flex-shrink: 0; accent-color: var(--primary); }
+.benefits-custom-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 18px; font-size: 13px; font-weight: 500; }
+.race-benefit-presets .button[aria-pressed="true"] { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-hover); }
+.race-extra-details { display: block; margin-top: 18px; }
+.race-field-row .event-contact-phone-row > label:first-child { grid-column: auto; }
 .race-prize-editor { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
 .race-prize-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .race-prize-heading strong { font-size: 14px; font-weight: 600; }
@@ -3210,3 +3220,20 @@ input[type="checkbox"] {
 .sidebar-bottom .profile > .avatar { display: none; }
 .sidebar-bottom .profile > span:nth-child(2) { flex: 1; min-width: 0; }
 .sidebar-bottom .profile strong, .sidebar-bottom .profile small { white-space: nowrap; }
+
+/* Keep event fields mounted while showing one task at a time. */
+.event-editor [hidden] { display: none !important; }
+.event-editor-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 20px 24px 0; padding: 5px; background: #f4f6f8; border: 1px solid var(--border); border-radius: 12px; }
+.event-editor-steps button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 10px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #536171; font: inherit; font-size: 13px; font-weight: 500; line-height: 1.5; text-align: left; cursor: pointer; transition: background var(--motion-fast), color var(--motion-fast); }
+.event-editor-steps button:hover:not(:disabled) { background: #e9edf1; color: var(--ink); }
+.event-editor-steps button[aria-current="step"], .event-editor-steps button[aria-current="step"]:hover:not(:disabled) { background: var(--surface); border-color: #e5b5a7; color: #9f351a; font-weight: 600; }
+.event-step-number { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; background: #e5eaf0; color: #536171; border-radius: 50%; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.event-editor-steps button[aria-current="step"] .event-step-number { background: var(--primary); color: #fff; }
+.event-editor-steps button:disabled { cursor: wait; opacity: .6; }
+.event-editor-position { margin-right: auto; align-self: center; color: var(--muted); font-size: 12px; }
+.event-editor .modal-body { min-height: 280px; align-content: start; }
+@media (max-width: 600px) {
+ .event-editor-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 16px 16px 0; padding: 4px; gap: 4px; }
+ .event-editor-steps button { justify-content: flex-start; min-height: 48px; font-size: 12px; padding: 8px; gap: 8px; }
+ .event-editor-position { display: none; }
+}

@@ -85,7 +85,7 @@ type Editing = { id: string | null; original: AdminEvent | null; form: EventForm
 /** `hasOrders` is set once the API refused a hard delete with EVENT_HAS_ORDERS. */
 type Confirm = { kind: "archive" | "delete"; event: AdminEvent; hasOrders: boolean };
 
-const emptyRace = (): RaceForm => ({ name: "", price: "0", quota: "100", start: "", prizes: [] });
+const emptyRace = (): RaceForm => ({ name: "", price: "0", quota: "100", unlimitedQuota: false, start: "", benefits: [], extraDetails: "", prizes: [] });
 
 function newEditing(): Editing {
   return {
@@ -99,9 +99,11 @@ function newEditing(): Editing {
       contactPhones: [],
       websiteUrl: "",
       locationUrl: "",
+      shirtPickupUrl: "",
       date: "",
       venue: "",
       startPoint: "",
+      shirtPickupPoint: "",
       province: "",
       category: "",
       theme: "",
@@ -110,7 +112,7 @@ function newEditing(): Editing {
       registrationEnds: "",
       organizer: "",
       refundPolicy: "",
-      races: [{ name: "5 KM", price: "399", quota: "500", start: "", prizes: [] }],
+      races: [{ name: "5 KM", price: "399", quota: "500", unlimitedQuota: false, start: "", benefits: [], extraDetails: "", prizes: [] }],
     },
   };
 }
@@ -127,9 +129,11 @@ function editingFrom(event: AdminEvent): Editing {
       contactPhones: event.contactPhones ?? [],
       websiteUrl: event.websiteUrl ?? "",
       locationUrl: event.locationUrl ?? "",
+      shirtPickupUrl: event.shirtPickupUrl ?? "",
       date: event.date,
       venue: event.venue,
       startPoint: event.startPoint ?? "",
+      shirtPickupPoint: event.shirtPickupPoint ?? "",
       province: event.province ?? "",
       category: event.category ?? "",
       theme: event.theme ?? "",
@@ -143,7 +147,10 @@ function editingFrom(event: AdminEvent): Editing {
         name: race.name,
         price: String(race.price),
         quota: String(race.quota),
+        unlimitedQuota: race.unlimitedQuota ?? false,
         start: race.start ?? "",
+        benefits: race.benefits ?? [],
+        extraDetails: race.extraDetails ?? "",
         prizes: (race.prizes ?? []).map((prize) => ({ rank: String(prize.rank), amount: String(prize.amount), trophy: prize.trophy ?? false })),
       })),
     },
@@ -251,6 +258,9 @@ function Events() {
   const [confirmError, setConfirmError] = useState("");
   const [confirmPending, setConfirmPending] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [editorStep, setEditorStep] = useState(0);
+  const editorForm = useRef<HTMLFormElement>(null);
+  const editorSteps = ["ข้อมูลงาน", "วันและสถานที่", "ระยะวิ่งและรางวัล", "รูปภาพ"];
   const [discardOpen, setDiscardOpen] = useState(false);
   const [viewing, setViewing] = useState<AdminEvent | null>(null);
   const [error, setError] = useState("");
@@ -292,6 +302,7 @@ function Events() {
   }, [searchParams, canEdit, ready, scopeEvents]);
 
   function open(next: Editing) {
+    setEditorStep(0);
     setError("");
     setFields({});
     setUploadStatus("");
@@ -314,6 +325,7 @@ function Events() {
     setUploadStatus("");
     setUploadFailures([]);
     setEditing(null);
+    setEditorStep(0);
   }
   function changeFilter(apply: () => void) {
     apply();
@@ -399,9 +411,33 @@ function Events() {
     }
   }
 
+  function navigateEditor(step: number) {
+    setEditorStep(step);
+    requestAnimationFrame(() => {
+      const body = editorForm.current?.querySelector(".modal-body");
+      body?.scrollTo({ top: 0 });
+      editorForm.current?.closest("dialog")?.scrollTo({ top: 0 });
+      editorForm.current?.querySelector<HTMLElement>(`[data-editor-step="${step}"] input, [data-editor-step="${step}"] select, [data-editor-step="${step}"] textarea, [data-editor-step="${step}"] button`)?.focus({ preventScroll: true });
+    });
+  }
+  function validateEditor(onlyCurrent = false) {
+    const controls = editorForm.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea");
+    const invalid = Array.from(controls ?? []).find((control) =>
+      (!onlyCurrent || control.closest("[data-editor-step]")?.getAttribute("data-editor-step") === String(editorStep)) && !control.checkValidity(),
+    );
+    if (!invalid) return true;
+    navigateEditor(Number(invalid.closest("[data-editor-step]")?.getAttribute("data-editor-step") ?? 0));
+    requestAnimationFrame(() => { invalid.focus(); invalid.reportValidity(); });
+    return false;
+  }
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editing) return;
+    if (editorStep < editorSteps.length - 1) {
+      if (validateEditor(true)) navigateEditor(editorStep + 1);
+      return;
+    }
+    if (!validateEditor()) return;
     setPending(true);
     setError("");
     setFields({});
@@ -438,7 +474,10 @@ function Events() {
       reload();
       reloadEvents();
     } catch (failure) {
-      setFields(fieldErrorsFor(failure));
+      const nextFields = fieldErrorsFor(failure);
+      setFields(nextFields);
+      const firstField = Object.keys(nextFields)[0] ?? "";
+      navigateEditor(firstField.startsWith("races") ? 2 : /^(date|registration|venue|startPoint|shirtPickupPoint|shirtPickupUrl|province|organizer|locationUrl|status|category|theme)/.test(firstField) ? 1 : 0);
       if (failure instanceof ApiError && failure.code === SLUG_TAKEN_CODE) {
         setSlugSuggestion(nextSlugVariant(editing.form.slug));
       }
@@ -505,7 +544,8 @@ function Events() {
             <div className="event-grid" aria-busy={loading}>
               {rows.map((event) => {
                 const quota = event.races.reduce((sum, race) => sum + race.quota, 0);
-                const count = quota - event.races.reduce((sum, race) => sum + race.remaining, 0);
+                const unlimited = event.races.some((race) => race.unlimitedQuota);
+                const count = event.races.reduce((sum, race) => sum + (race.unlimitedQuota ? (race.reserved ?? 0) : race.quota - race.remaining), 0);
                 const lowest = Math.min(...event.races.map((race) => race.price));
                 return (
                   <article className="event-card" key={event.id}>
@@ -538,14 +578,14 @@ function Events() {
                           </span>
                           <strong>
                             {number(count)}
-                            <span> / {number(quota)} คน</span>
+                            <span> / {unlimited ? "ไม่จำกัดจำนวน" : `${number(quota)} คน`}</span>
                           </strong>
                         </div>
-                        <progress
+                        {!unlimited && <progress
                           value={count}
                           max={Math.max(1, quota)}
                           aria-label={`จองแล้ว ${count} จากจำนวนที่รับ ${quota} คน`}
-                        />
+                        />}
                       </div>
                       <div className="event-card-footer">
                         <span>ราคาเริ่มต้น {money(lowest)}</span>
@@ -629,14 +669,21 @@ function Events() {
           className="event-editor"
           wide
         >
-          <form onSubmit={save}>
+          <form ref={editorForm} onSubmit={save} noValidate>
+            <nav className="event-editor-steps" aria-label="หมวดข้อมูลงานวิ่ง">
+              {editorSteps.map((label, index) => (
+                <button key={label} type="button" aria-current={editorStep === index ? "step" : undefined} disabled={pending} onClick={() => navigateEditor(index)}>
+                  <span className="event-step-number">{index + 1}</span><span>{label}</span>
+                </button>
+              ))}
+            </nav>
             <div className="modal-body form-grid">
               {error && (
                 <p className="form-error full" role="alert">
                   {error}
                 </p>
               )}
-              <fieldset className="event-form-section full form-grid">
+              <fieldset data-editor-step="0" hidden={editorStep !== 0} className="event-form-section full form-grid">
                 <legend>ข้อมูลงานวิ่ง</legend>
               <label className="full">
                 ชื่องานวิ่ง
@@ -727,7 +774,7 @@ function Events() {
                 </div>)}
               </div>
               </fieldset>
-              <fieldset className="event-form-section full form-grid">
+              <fieldset data-editor-step="1" hidden={editorStep !== 1} className="event-form-section full form-grid">
                 <legend>กำหนดการและการเปิดรับสมัคร</legend>
               <label>
                 วันที่จัดงาน (พ.ศ.)
@@ -819,7 +866,7 @@ function Events() {
                 <FieldError message={fields.theme} />
               </label>
               </fieldset>
-              <fieldset className="event-form-section full form-grid">
+              <fieldset data-editor-step="1" hidden={editorStep !== 1} className="event-form-section full form-grid">
                 <legend>สถานที่และผู้จัดงาน</legend>
               <label className="full">
                 สถานที่
@@ -842,6 +889,17 @@ function Events() {
                 จุดปล่อยตัว (ไม่บังคับ)
                 <input maxLength={300} placeholder="เช่น ประตูทางเข้าหลัก หรือบริเวณลานหน้าอาคาร" value={form.startPoint} aria-invalid={Boolean(fields.startPoint)} onChange={(e) => setForm({ startPoint: e.target.value })} />
                 <FieldError message={fields.startPoint} />
+              </label>
+              <label className="full">
+                จุดรับเสื้อ (ไม่บังคับ)
+                <input maxLength={300} placeholder="เช่น อาคารอเนกประสงค์ ชั้น 1 หรือบูธรับเสื้อบริเวณหน้างาน" value={form.shirtPickupPoint} aria-invalid={Boolean(fields.shirtPickupPoint)} onChange={(e) => setForm({ shirtPickupPoint: e.target.value })} />
+                <FieldError message={fields.shirtPickupPoint} />
+              </label>
+              <label className="full">
+                ลิงก์แผนที่จุดรับเสื้อ (ไม่บังคับ)
+                <input type="url" maxLength={2048} placeholder="https:// เช่น ลิงก์แชร์จุดรับเสื้อจาก Google Maps" value={form.shirtPickupUrl} aria-invalid={Boolean(fields.shirtPickupUrl)} onChange={(e) => setForm({ shirtPickupUrl: e.target.value })} />
+                <FieldError message={fields.shirtPickupUrl} />
+                <small className="field-hint">หากไม่ใส่ลิงก์ จะค้นหา Google Maps จากชื่อจุดรับเสื้อและสถานที่จัดงาน</small>
               </label>
               <label>
                 จังหวัด
@@ -875,7 +933,7 @@ function Events() {
                 <FieldError message={fields.refundPolicy} />
               </label>
               </fieldset>
-              <fieldset className="full race-fields event-form-section">
+              <fieldset data-editor-step="2" hidden={editorStep !== 2} className="full race-fields event-form-section">
                 <legend>ระยะวิ่งและราคา</legend>
                 {original && original.orderCount > 0 && (
                   <p className="muted">
@@ -910,9 +968,13 @@ function Events() {
                         />
                         <FieldError message={fields[`races.${index}.price`]} />
                       </label>
-                      <label>
-                        จำนวนที่รับ (คน)
-                        <input
+                      <div className="field-clearable">
+                        <label>จำนวนที่รับสมัคร
+                        <select value={race.unlimitedQuota ? "unlimited" : "limited"} onChange={(e) => setRace(index, { unlimitedQuota: e.target.value === "unlimited" })}>
+                          <option value="limited">กำหนดจำนวนเอง</option>
+                          <option value="unlimited">ไม่จำกัดจำนวน</option>
+                        </select></label>
+                        {!race.unlimitedQuota && <input aria-label="จำนวนที่รับ (คน)"
                           type="number"
                           min="1"
                           step="1"
@@ -920,9 +982,9 @@ function Events() {
                           value={race.quota}
                           aria-invalid={Boolean(fields[`races.${index}.quota`])}
                           onChange={(e) => setRace(index, { quota: e.target.value })}
-                        />
+                        />}
                         <FieldError message={fields[`races.${index}.quota`]} />
-                      </label>
+                      </div>
                       <div className="field-clearable">
                         <label>
                           เวลาปล่อยตัว
@@ -943,6 +1005,15 @@ function Events() {
                             ล้างเวลา
                           </button>
                         )}
+                      </div>
+                      <div className="race-benefits-editor full">
+                        <div className="race-prize-heading"><strong>ผู้สมัครระยะ {race.name || "นี้"} จะได้รับอะไรบ้าง?</strong></div>
+                        <p className="benefits-help">เลือกได้หลายข้อ ไม่เลือกได้หากยังไม่กำหนด</p>
+                        <div className="race-benefit-presets" role="group" aria-label={`สิ่งที่ได้รับของระยะ ${race.name}`}>{[{ value: "เสื้อ", label: "เสื้อที่ระลึก" }, { value: "BIB", label: "หมายเลขวิ่ง (BIB)" }, { value: "เหรียญ", label: "เหรียญที่ระลึก" }].map(({ value, label }) => <label className="benefit-choice" key={value}><input type="checkbox" checked={race.benefits.includes(value)} disabled={!race.benefits.includes(value) && race.benefits.length >= 20} onChange={(e) => setRace(index, { benefits: e.target.checked ? [...race.benefits, value] : race.benefits.filter((item) => item !== value) })} /><span>{label}</span></label>)}</div>
+                        <div className="benefits-custom-heading"><span>สิ่งที่ได้รับอื่น ๆ</span><button type="button" className="text-link" disabled={race.benefits.length >= 20} onClick={() => setRace(index, { benefits: [...race.benefits, ""] })}><Plus size={15} aria-hidden="true" />เพิ่มรายการอื่น</button></div>
+                        <FieldError message={fields[`races.${index}.benefits`]} />
+                        {race.benefits.map((benefit, benefitIndex) => ["เสื้อ", "BIB", "เหรียญ"].includes(benefit) ? null : <div className="event-contact-phone-row" key={benefitIndex}><label>รายการอื่น<input key={`${benefitIndex}-${benefit}`} defaultValue={benefit} maxLength={100} placeholder="เช่น อาหารหลังวิ่ง หรือกระเป๋าที่ระลึก" onBlur={(e) => setRace(index, { benefits: race.benefits.map((value, i) => i === benefitIndex ? e.target.value : value) })} /><FieldError message={fields[`races.${index}.benefits.${benefitIndex}`]} /></label><button type="button" className="button small-button" aria-label={`ลบสิ่งที่ได้รับ ${benefitIndex + 1} ของระยะ ${race.name}`} onClick={() => setRace(index, { benefits: race.benefits.filter((_, i) => i !== benefitIndex) })}><Trash2 size={16} aria-hidden="true" />ลบ</button></div>)}
+                        <label className="race-extra-details">รายละเอียดเพิ่มเติมของระยะนี้ (ไม่บังคับ)<textarea rows={3} maxLength={2000} placeholder="เช่น เงื่อนไขรับเหรียญ หรือสิทธิพิเศษ" value={race.extraDetails} onChange={(e) => setRace(index, { extraDetails: e.target.value })} /><FieldError message={fields[`races.${index}.extraDetails`]} /></label>
                       </div>
                       <div className="race-prize-editor">
                         <div className="race-prize-heading"><strong>อันดับและรางวัล · {race.name || "ระยะนี้"}</strong><button type="button" className="text-link" disabled={race.prizes.length >= 100} onClick={() => {
@@ -984,7 +1055,7 @@ function Events() {
                   </button>
                 )}
               </fieldset>
-              <section className="event-image-section full" aria-label="รูปภาพงานวิ่ง">
+              <section data-editor-step="3" hidden={editorStep !== 3} className="event-image-section full" aria-label="รูปภาพงานวิ่ง">
               {editing.id && original ? (
                 <EventImagesSection
                   key={editing.id}
@@ -1016,7 +1087,9 @@ function Events() {
               <button className="button" type="button" onClick={close}>
                 ยกเลิก
               </button>
-              <button className="button primary" type="submit" disabled={pending}>
+              <span className="event-editor-position">ขั้นตอน {editorStep + 1} จาก {editorSteps.length}</span>
+              {editorStep > 0 && <button className="button" type="button" disabled={pending} onClick={() => navigateEditor(editorStep - 1)}>ย้อนกลับ</button>}
+              {editorStep < editorSteps.length - 1 ? <button className="button primary" type="button" disabled={pending} onClick={() => { if (validateEditor(true)) navigateEditor(editorStep + 1); }}>ถัดไป</button> : <button className="button primary" type="submit" disabled={pending}>
                 <Save size={16} aria-hidden="true" />
                 {pending
                   ? editing.id
@@ -1025,7 +1098,7 @@ function Events() {
                   : editing.id
                     ? "บันทึก"
                     : "สร้างงานวิ่ง"}
-              </button>
+              </button>}
             </div>
           </form>
         </Modal>

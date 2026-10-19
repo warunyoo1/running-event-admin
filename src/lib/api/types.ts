@@ -48,8 +48,10 @@ export type Race = {
   id: string;
   name: string;
   price: number;
-  quota: number;
+  quota: number; unlimitedQuota?: boolean; reserved?: number;
   start: string | null;
+  benefits?: string[];
+  extraDetails?: string;
   prizes?: { rank: number; amount: number; trophy?: boolean }[];
   remaining: number;
 };
@@ -77,9 +79,11 @@ export type AdminEvent = {
   contactPhones?: string[];
   websiteUrl?: string;
   locationUrl?: string;
+  shirtPickupUrl?: string;
   date: string;
   venue: string;
   startPoint?: string;
+  shirtPickupPoint?: string;
   province?: string;
   category?: EventCategory;
   theme?: EventTheme;
@@ -261,7 +265,7 @@ export type DashboardRace = {
   eventName: string;
   name: string;
   price: number;
-  quota: number;
+  quota: number; unlimitedQuota?: boolean;
   reserved: number;
   remaining: number;
 };
@@ -298,9 +302,11 @@ export type RaceBody = {
   id?: string;
   name: string;
   price: number;
-  quota: number;
+  quota: number; unlimitedQuota?: boolean; reserved?: number;
   /** `null` clears the start time. */
   start?: string | null;
+  benefits?: string[];
+  extraDetails?: string;
   prizes?: { rank: number; amount: number; trophy?: boolean }[];
 };
 export type EventBody = {
@@ -311,9 +317,11 @@ export type EventBody = {
   contactPhones?: string[];
   websiteUrl?: string;
   locationUrl?: string;
+  shirtPickupUrl?: string;
   date: string;
   venue: string;
   startPoint?: string;
+  shirtPickupPoint?: string;
   province?: string;
   /** `null` resets to the API default. */
   category?: EventCategory | null;
