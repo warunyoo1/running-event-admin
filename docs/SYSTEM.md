@@ -15,6 +15,7 @@ Repo นี้: Frontend (Next.js) ของระบบ Admin เท่าน�
 - ข้อจำกัดที่เหลือ: แดชบอร์ดยังนับระยะและออเดอร์ของงานที่เก็บถาวรอยู่ (ตั้งใจไม่เปลี่ยนค่า) ตัวกรองระยะในหน้าผู้สมัครสร้างจากงานที่ยังไม่เก็บถาวรเท่านั้น และระบบไม่ส่งอีเมลเชิญผู้ใช้
 - เลือกงานที่ sidebar เพื่อกรองภาพรวม ออเดอร์ สลิป ผู้สมัคร การจัดส่ง และรายงาน โดยจำเฉพาะ id งานที่เลือกไว้ใน localStorage; เมนูส่วนกลาง “จัดการงานวิ่ง” และ “ผู้ใช้และสิทธิ์” ไม่ถูกกรองตามงาน
 - ล็อกอินผ่าน cookie httpOnly `rr_admin_token` ที่ API ออกให้ เบราว์เซอร์เรียก `/api/v1/admin/...` ที่ origin เดียวกัน แล้ว Next rewrite ไปที่ `API_PROXY_TARGET`; `src/proxy.ts` ตรวจแค่ว่ามี cookie ส่วนการตรวจสิทธิ์จริงทำที่ `GET /auth/me` และที่ API
+- Deploy: Docker image (`output: "standalone"`) ผ่าน GitHub Actions ไป GHCR แล้ว SSH deploy แบบเดียวกับ API; `API_PROXY_TARGET` เป็น build arg ฝังตอน build รายละเอียดใน `README.md`
 - เริ่มพัฒนา: ตั้ง `.env.local` ตาม `.env.example` แล้ว `npm install` และ `npm run dev`; ตรวจสอบ: `npm run typecheck` และ `npm run build`
 - ใช้ skill `ui-ux-pro-max` ร่วมกับ `frontend-design`; ยังไม่เพิ่มชุด UI, ตาราง หรือฟอร์มที่ไม่จำเป็นกับโครงปัจจุบัน
 

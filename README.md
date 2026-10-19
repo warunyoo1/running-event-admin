@@ -28,6 +28,95 @@ The API port must be reachable from the machine running Next (the rewrite runs s
 
 HTTP warning: with plain HTTP, credentials travel in clear text between Next and the API, and between the browser and Next if the admin is also on HTTP. Use HTTPS for both before production.
 
+## Docker และ CI/CD (deploy เหมือน running-event-api)
+
+`next.config.ts` ใช้ `output: "standalone"`; `Dockerfile` เป็น multi-stage (deps, build, runner) รันเป็น user `node` ที่ port 3000 และมี HEALTHCHECK ที่ `/login` (ไม่เรียก API)
+
+### `API_PROXY_TARGET` เป็น build arg
+`rewrites()` ถูกประเมินตอน `next build` และค่าถูกฝังใน `.next/routes-manifest.json` ดังนั้น image ต้องได้ค่านี้ตอน build (`--build-arg API_PROXY_TARGET=...`) แก้ env ตอนรัน container ไม่มีผล ถ้าจะเปลี่ยน URL ของ API ต้อง build image ใหม่ ถ้าไม่ส่ง build arg การ build จะหยุดพร้อมข้อความ error
+
+### รันบนเครื่องด้วย Docker Compose
+```bash
+API_PROXY_TARGET=http://host.docker.internal:4000 docker compose up -d --build
+```
+- ค่าเริ่มต้นของ build arg คือ `http://host.docker.internal:4000` (API ที่รันบนเครื่อง host)
+- bind ที่ `127.0.0.1:3000` เท่านั้น (เปลี่ยนด้วย `ADMIN_HOST_PORT`)
+
+### CI/CD
+workflow: `.github/workflows/ci-cd.yml` (โครงเดียวกับ API)
+- pull request เข้า `main`: `typecheck` และ `build`
+- push เข้า `main`: ตรวจเหมือนกัน แล้ว build/push `ghcr.io/warunyoo1/running-event-admin` (tag `latest` และ commit SHA) ด้วย `GITHUB_TOKEN` จากนั้น SSH เข้า server เพื่อ `pull admin`, `up -d`, รอ healthcheck และ `docker image prune -f`
+
+GitHub ที่ต้องตั้ง (Settings > Secrets and variables > Actions) ใช้ชื่อเดียวกับ API:
+
+| ชื่อ | ประเภท | จำเป็น |
+|---|---|---|
+| `API_PROXY_TARGET` | variable | ใช่ (production: `https://api.walkruntogive2027.com` ไม่มี `/` ท้าย) |
+| `SSH_HOST`, `SSH_USER`, `SSH_KEY` | secret | ใช่ |
+| `SSH_PORT` | secret | ไม่ (ค่าเริ่มต้น 22) |
+| `SSH_KNOWN_HOSTS` | secret | แนะนำ |
+| `DEPLOY_PATH` | variable หรือ secret | ไม่ (ค่าเริ่มต้น `/var/www/projects/running-event-admin`) |
+
+### Deploy ครั้งแรกบน server
+```bash
+sudo mkdir -p /var/www/projects/running-event-admin
+sudo chown <deploy-user>: /var/www/projects/running-event-admin
+# คัดลอก docker-compose.prod.yml ไปไว้ที่โฟลเดอร์นี้ (workflow ไม่ได้ส่งไฟล์ให้)
+cd /var/www/projects/running-event-admin
+docker compose -f docker-compose.prod.yml pull admin
+docker compose -f docker-compose.prod.yml up -d
+curl -I http://127.0.0.1:3000/login     # ต้องได้ 200
+```
+server ต้อง login GHCR ไว้แล้วเหมือนฝั่ง API (หรือตั้ง package เป็น public) ไม่ต้องมี `.env` เพราะไม่มี secret ตอนรัน
+
+### nginx (DirectAdmin, nginx_apache)
+ทำแบบเดียวกับ API: สร้างไฟล์ server block แล้ว include จาก `/etc/nginx/nginx-includes.conf` (เปลี่ยนโดเมนให้ตรงของจริง)
+
+```nginx
+# /etc/nginx/admin-walkruntogive2027.conf   <-- ปรับโดเมนและ IP ให้ตรงกับของจริง
+server {
+    listen <server-ip>:80;
+    server_name admin.walkruntogive2027.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# เพิ่มบล็อกนี้หลังออกใบรับรองด้วย certbot (webroot /var/www/letsencrypt) สำเร็จแล้ว
+server {
+    listen <server-ip>:443 ssl;
+    http2 on;
+    server_name admin.walkruntogive2027.com;
+
+    ssl_certificate     /etc/letsencrypt/live/admin.walkruntogive2027.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/admin.walkruntogive2027.com/privkey.pem;
+
+    location / {
+        client_max_body_size 8m;   # อัปโหลดรูปงานวิ่งผ่าน /api (ให้ตรงกับฝั่ง API)
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # ไม่ต้องใช้ websocket upgrade header สำหรับแอปนี้
+    }
+}
+```
+ขั้นตอน: ใส่เฉพาะบล็อก HTTP ก่อน, `echo 'include /etc/nginx/admin-walkruntogive2027.conf;' >> /etc/nginx/nginx-includes.conf`, `nginx -t && systemctl reload nginx`, ออกใบรับรองด้วย certbot แบบ webroot, แล้วจึงเพิ่มบล็อก HTTPS และเปลี่ยน `location /` ของ HTTP เป็น redirect
+
+### ค่าที่ต้องตั้งฝั่ง API
+- `CORS_ORIGINS` ต้องมี origin ของ admin ตรงตัว เช่น `https://admin.walkruntogive2027.com` (ไม่มี `/` ท้าย)
+- `COOKIE_SECURE=true` เมื่อใช้ HTTPS
+- `TRUST_PROXY=1`
+- `API_PROXY_TARGET` (build arg) ต้องเป็น URL สาธารณะของ API: `https://api.walkruntogive2027.com`
+
+cookie `rr_admin_token` เป็น httpOnly, SameSite=Lax และใช้ได้เพราะเบราว์เซอร์คุยกับ origin ของ admin เท่านั้น (เรียก `/api` แบบ same-origin แล้ว Next rewrite ไปที่ API)
+
 ## Roles
 
 `super_admin`, `reviewer`, `viewer`. The UI hides actions as a convenience; the API is the authority.

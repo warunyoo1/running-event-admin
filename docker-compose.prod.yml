@@ -1,0 +1,23 @@
+# Production compose: ใช้ image จาก GHCR (ไม่ build บน server)
+# ไม่ต้องมี .env: admin ไม่มี secret ที่ runtime
+#   API_PROXY_TARGET ถูกฝังใน image ตอน build (build arg จาก GitHub variable) ไม่ได้อ่านตอนรัน
+#   ถ้าจะเปลี่ยน URL ของ API ต้องแก้ variable แล้วรัน workflow ใหม่เพื่อ build image ใหม่
+# วางไฟล์นี้ไว้ใน DEPLOY_PATH (/var/www/projects/running-event-admin) แล้วรัน:
+#   docker compose -f docker-compose.prod.yml pull admin
+#   docker compose -f docker-compose.prod.yml up -d
+services:
+  admin:
+    image: ghcr.io/warunyoo1/running-event-admin:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    # bind เฉพาะ loopback: ให้ nginx (DirectAdmin) บน host เป็นด่านหน้า ไม่เปิดออก IP ตรงๆ
+    ports:
+      - "127.0.0.1:${ADMIN_HOST_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
