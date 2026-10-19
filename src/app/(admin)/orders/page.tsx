@@ -87,7 +87,15 @@ function Orders() {
           </button>
         }
       />
-      <div className="panel">
+      <div className="panel orders-panel">
+        <div className="order-status-shortcuts" role="group" aria-label="กรองออเดอร์ตามสถานะ">
+          {(["", "slip_uploaded", "pending", "paid"] as const).map((value) => (
+            <button key={value} type="button" aria-pressed={status === value}
+              onClick={() => changeFilter(() => setStatus(value))}>
+              {value ? statusLabels[value] : "ทั้งหมด"}
+            </button>
+          ))}
+        </div>
         <div className="filter-bar in-panel">
           <SearchField
             value={query}
@@ -178,7 +186,7 @@ function Orders() {
                           {o.eventName}
                         </td>
                         <td
-                          className="numeric strong mobile-amount"
+                          className="numeric strong mobile-amount order-amount"
                           data-label="ยอดชำระ"
                         >
                           {money(o.amount)}

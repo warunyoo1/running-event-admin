@@ -325,8 +325,9 @@ export default function ShippingPage() {
               </>
             ) : (
               <EmptyState
-                title="ไม่พบรายการ"
-                description="หน้านี้แสดงเฉพาะออเดอร์ที่ชำระเงินแล้ว"
+                title={query.trim() ? "ไม่พบรายการที่ตรงกับการค้นหา" : tab === "pickup" ? "ยังไม่มีออเดอร์ชำระแล้วสำหรับรับหน้างาน" : "ยังไม่มีออเดอร์ชำระแล้วสำหรับจัดส่ง"}
+                description={query.trim() ? "ลองค้นหาด้วยชื่อ เลข BIB หรือเลขออเดอร์อื่น" : "รายการจะแสดงที่นี่เมื่อออเดอร์ชำระเงินแล้ว"}
+                action={query.trim() ? <button className="button" onClick={() => changeQuery("")}>ล้างคำค้นหา</button> : undefined}
               />
             ))}
         </div>

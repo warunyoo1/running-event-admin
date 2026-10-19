@@ -58,6 +58,9 @@ function AuditLogs() {
   );
   const rows = data?.data ?? [];
 
+  const hasFilters = Boolean(userId || action || entity || targetId || from || to);
+  function resetFilters() { setUserId(""); setAction(""); setEntity(""); setTargetId(""); setFrom(""); setTo(""); setPage(1); }
+
   function changeFilter(apply: () => void) {
     apply();
     setPage(1);
@@ -71,9 +74,9 @@ function AuditLogs() {
         scope="global"
       />
       <div className="panel">
-        <div className="filter-bar in-panel">
+        <div className="audit-filters">
           <label>
-            <span className="sr-only">ทำโดย</span>
+            <span>ทำโดย</span>
             <select
               value={userId}
               onChange={(e) => changeFilter(() => setUserId(e.target.value))}
@@ -87,7 +90,7 @@ function AuditLogs() {
             </select>
           </label>
           <label>
-            <span className="sr-only">สิ่งที่ทำ</span>
+            <span>สิ่งที่ทำ</span>
             <select
               value={action}
               onChange={(e) => changeFilter(() => setAction(e.target.value))}
@@ -101,7 +104,7 @@ function AuditLogs() {
             </select>
           </label>
           <label>
-            <span className="sr-only">เกี่ยวกับ</span>
+            <span>เกี่ยวกับ</span>
             <select
               value={entity}
               onChange={(e) =>
@@ -117,17 +120,7 @@ function AuditLogs() {
             </select>
           </label>
           <label>
-            <span className="sr-only">รหัสอ้างอิงของออเดอร์หรืองานวิ่ง</span>
-            <input
-              type="search"
-              value={targetId}
-              placeholder="รหัสอ้างอิงของออเดอร์หรืองาน (24 ตัว)"
-              aria-invalid={invalidTarget}
-              onChange={(e) => changeFilter(() => setTargetId(e.target.value))}
-            />
-          </label>
-          <label>
-            <span className="sr-only">ตั้งแต่วันที่</span>
+            <span>ตั้งแต่วันที่</span>
             <input
               type="date"
               value={from}
@@ -136,7 +129,7 @@ function AuditLogs() {
             />
           </label>
           <label>
-            <span className="sr-only">ถึงวันที่</span>
+            <span>ถึงวันที่</span>
             <input
               type="date"
               value={to}
@@ -147,6 +140,22 @@ function AuditLogs() {
           <span className="result-count">
             {data ? `${data.meta.total} รายการ` : ""}
           </span>
+        </div>
+        <div className="audit-filter-tools">
+          <details className="audit-advanced"><summary>ค้นหาด้วยรหัสอ้างอิง</summary>
+          <label>
+            <span>รหัสอ้างอิง (24 ตัว)</span>
+            <input
+              type="search"
+              value={targetId}
+              placeholder="รหัสอ้างอิงของออเดอร์หรืองาน (24 ตัว)"
+              aria-invalid={invalidTarget}
+              onChange={(e) => changeFilter(() => setTargetId(e.target.value))}
+            />
+          </label>
+
+          </details>
+          {hasFilters && <button className="button small-button" onClick={resetFilters}>ล้างตัวกรองทั้งหมด</button>}
         </div>
         {invalidRange && (
           <p role="alert" className="form-error">
@@ -164,7 +173,7 @@ function AuditLogs() {
           (rows.length ? (
             <>
               <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม" aria-busy={loading}>
-                <table className="table-mobile-cards" role="table">
+                <table className="table-mobile-cards audit-table" role="table">
                   <thead>
                     <tr>
                       <th>เวลา</th>
@@ -225,7 +234,7 @@ function AuditLogs() {
               <Pager meta={data.meta} unit="รายการ" onPage={setPage} />
             </>
           ) : (
-            <EmptyState title="ไม่พบประวัติการใช้งาน" />
+            <EmptyState title="ไม่พบประวัติการใช้งาน" action={hasFilters ? <button className="button" onClick={resetFilters}>ล้างตัวกรองทั้งหมด</button> : undefined} />
           ))}
       </div>
     </>

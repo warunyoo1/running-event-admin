@@ -32,6 +32,7 @@ import { errorMessage } from "@/lib/api/errors";
 import { ALL_EVENTS, MUST_CHANGE_PASSWORD_SHOWN_KEY } from "@/lib/constants";
 import { ChangePasswordModal } from "./change-password-modal";
 import { Modal } from "./ui";
+import { EventScopeSelect } from "./event-scope-select";
 
 type NavItem = {
   href: string;
@@ -235,31 +236,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         >
           <X size={21} />
         </button>
+        <div className="sidebar-navigation">
         <div className="workspace-label">
-          <label className="workspace-caption" htmlFor="event-scope">
-            เลือกงานวิ่ง
-          </label>
-          <div className="workspace-selector">
-            <Flag size={17} aria-hidden="true" />
-            <select
-              id="event-scope"
-              disabled={!ready}
-              value={eventId}
-              onChange={(event) => setEventId(event.target.value)}
-              aria-describedby="event-scope-hint"
-              title={scopeLabel}
-            >
-              <option value={ALL_EVENTS}>งานวิ่งทั้งหมด</option>
-              {events.map((event) => (
-                <option value={event.id} key={event.id}>
-                  {event.name}
-                </option>
-              ))}
-            </select>
-            <span className="workspace-selected" aria-hidden="true">{scopeLabel}</span>
-            <ChevronDown size={15} aria-hidden="true" />
-          </div>
-          <p id="event-scope-hint" className="workspace-hint">
+          <EventScopeSelect
+            options={[{ id: ALL_EVENTS, name: "งานวิ่งทั้งหมด" }, ...events]}
+            value={eventId}
+            onChange={setEventId}
+            disabled={!ready}
+            label={scopeLabel}
+          />
+          <p id="event-scope-hint" className="sr-only">
             {eventId === ALL_EVENTS
               ? "แสดงข้อมูลรวมของทุกงานวิ่ง"
               : "แสดงข้อมูลเฉพาะงานที่เลือก"}
@@ -277,6 +263,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <nav aria-labelledby="global-navigation-label">
           {renderNavigation("global")}
         </nav>
+        </div>
         <div className="sidebar-bottom">
           <button
             className="nav-item help-button"

@@ -13,6 +13,7 @@ import {
   Users,
   Save,
 } from "lucide-react";
+import { DiscardChangesDialog } from "@/components/discard-changes-dialog";
 import { useAuth } from "@/features/admin/auth-provider";
 import {
   EventImagesSection,
@@ -238,6 +239,7 @@ function Events() {
   const [confirmError, setConfirmError] = useState("");
   const [confirmPending, setConfirmPending] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [viewing, setViewing] = useState<AdminEvent | null>(null);
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -291,7 +293,11 @@ function Events() {
   }
   function close() {
     if (pending) return;
-    if (dirty && !window.confirm("มีข้อมูลที่ยังไม่ได้บันทึก ต้องการทิ้งการแก้ไขและปิดหน้าต่างหรือไม่?")) return;
+    if (dirty) { setDiscardOpen(true); return; }
+    discard();
+  }
+  function discard() {
+    setDiscardOpen(false);
     staged.clear();
     setUploadStatus("");
     setUploadFailures([]);
@@ -598,10 +604,17 @@ function Events() {
           <EventImagesPanel event={viewing} />
         </Modal>
       )}
+      {discardOpen && (
+        <DiscardChangesDialog
+          onContinue={() => setDiscardOpen(false)}
+          onDiscard={discard}
+        />
+      )}
       {editing && form && (
         <Modal
           title={editing.id ? "แก้ไขงานวิ่ง" : "สร้างงานวิ่งใหม่"}
           onClose={close}
+          className="event-editor"
           wide
         >
           <form onSubmit={save}>
@@ -611,6 +624,8 @@ function Events() {
                   {error}
                 </p>
               )}
+              <fieldset className="event-form-section full form-grid">
+                <legend>ข้อมูลงานวิ่ง</legend>
               <label className="full">
                 ชื่องานวิ่ง
                 <input
@@ -686,6 +701,9 @@ function Events() {
                 />
                 <FieldError message={fields.description} />
               </label>
+              </fieldset>
+              <fieldset className="event-form-section full form-grid">
+                <legend>กำหนดการและการเปิดรับสมัคร</legend>
               <label>
                 วันที่จัดงาน
                 <input
@@ -768,6 +786,9 @@ function Events() {
                 </select>
                 <FieldError message={fields.theme} />
               </label>
+              </fieldset>
+              <fieldset className="event-form-section full form-grid">
+                <legend>สถานที่และผู้จัดงาน</legend>
               <label className="full">
                 สถานที่
                 <input
@@ -810,7 +831,8 @@ function Events() {
                 />
                 <FieldError message={fields.refundPolicy} />
               </label>
-              <fieldset className="full race-fields">
+              </fieldset>
+              <fieldset className="full race-fields event-form-section">
                 <legend>ระยะวิ่งและราคา</legend>
                 {original && original.orderCount > 0 && (
                   <p className="muted">
@@ -905,6 +927,7 @@ function Events() {
                   </button>
                 )}
               </fieldset>
+              <section className="event-image-section full" aria-label="รูปภาพงานวิ่ง">
               {editing.id && original ? (
                 <EventImagesSection
                   key={editing.id}
@@ -918,6 +941,7 @@ function Events() {
               ) : (
                 <StagedImagesSection staged={staged} busy={pending} status={uploadStatus} />
               )}
+              </section>
               {editing.id && uploadFailures.length > 0 && (
                 <div className="form-error full" role="alert">
                   <p>อัปโหลดรูปไม่สำเร็จ {uploadFailures.length} ไฟล์ (สร้างงานวิ่งเรียบร้อยแล้ว)</p>

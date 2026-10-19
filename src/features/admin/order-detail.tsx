@@ -124,7 +124,7 @@ export function OrderDetail({
   const title = review ? "ตรวจสลิป" : "รายละเอียดออเดอร์";
   if (!order) {
     return (
-      <Modal title={title} wide onClose={onClose}>
+      <Modal title={title} wide className={review ? "review-dialog" : ""} onClose={onClose}>
         <div className="modal-body">
           {loadError && <ErrorState message={loadError} onRetry={reload} />}
           {loading && <LoadingState />}
@@ -147,7 +147,7 @@ export function OrderDetail({
     order.payments[0]?.id ??
     null;
   return (
-    <Modal title={title} wide onClose={onClose}>
+    <Modal title={title} wide className={review ? "review-dialog" : ""} onClose={onClose}>
       <div className="modal-body">
         <div className="detail-heading">
           <div>
@@ -160,7 +160,24 @@ export function OrderDetail({
           {review && (
             <div className="slip-preview">
               <SlipImage paymentId={slipPaymentId} />
+              <span className="review-amount-label">ยอดที่ต้องชำระ</span>
               <b>{money(order.amount)}</b>
+        {canReview && mode === "view" && (
+          <label className="rejection-field">
+            เลขอ้างอิงการโอน (ดูจากสลิป)
+            <input
+              value={transactionRef}
+              maxLength={64}
+              aria-invalid={Boolean(fieldErrors.transactionRef)}
+              onChange={(e) => setTransactionRef(e.target.value)}
+              placeholder="เช่น 202610150001"
+            />
+            {fieldErrors.transactionRef && (
+              <small className="danger-text">{fieldErrors.transactionRef}</small>
+            )}
+          </label>
+        )}
+
             </div>
           )}
           <div>
@@ -269,21 +286,6 @@ export function OrderDetail({
             </div>
           </div>
         </div>
-        {canReview && mode === "view" && (
-          <label className="rejection-field">
-            เลขอ้างอิงการโอน (ดูจากสลิป)
-            <input
-              value={transactionRef}
-              maxLength={64}
-              aria-invalid={Boolean(fieldErrors.transactionRef)}
-              onChange={(e) => setTransactionRef(e.target.value)}
-              placeholder="เช่น 202610150001"
-            />
-            {fieldErrors.transactionRef && (
-              <small className="danger-text">{fieldErrors.transactionRef}</small>
-            )}
-          </label>
-        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -324,10 +326,19 @@ export function OrderDetail({
             )}
           </label>
         )}
-        <OrderNotes orderId={order.id} notes={order.notes} onChanged={reload} />
-        <OrderTimeline entries={order.timeline} />
+        {review ? (
+          <details className="review-history">
+            <summary>บันทึกภายในและประวัติออเดอร์</summary>
+            <OrderNotes orderId={order.id} notes={order.notes} onChanged={reload} />
+            <OrderTimeline entries={order.timeline} />
+          </details>
+        ) : <>
+          <OrderNotes orderId={order.id} notes={order.notes} onChanged={reload} />
+          <OrderTimeline entries={order.timeline} />
+        </>}
       </div>
       <div className="modal-actions">
+        {review && <div className="review-footer-total"><small>ยอดที่ต้องชำระ</small><strong>{money(order.amount)}</strong></div>}
         {mode === "rejecting" ? (
           <>
             <button

@@ -142,6 +142,7 @@ export default function ParticipantsPage() {
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [activeBib, setActiveBib] = useState<string | null>(null);
+  const [missingBibOnly, setMissingBibOnly] = useState(false);
   const q = useDebounced(query.trim());
   const filters = { eventId: scopeEventId, q, race, status };
   const { data, error, loading, reload } = useAsync(
@@ -152,7 +153,9 @@ export default function ParticipantsPage() {
       ),
     [scopeEventId, q, race, status, page],
   );
-  const rows = data?.data ?? [];
+  const allRows = data?.data ?? [];
+  const rows = missingBibOnly ? allRows.filter((row) => row.orderStatus === "paid" && !row.bibNo) : allRows;
+  const missingCount = allRows.filter((row) => row.orderStatus === "paid" && !row.bibNo).length;
   const raceNames = [
     ...new Set(
       events
@@ -183,6 +186,7 @@ export default function ParticipantsPage() {
   const hasFilters = Boolean(query || status || race);
   function resetFilters() { setQuery(""); setStatus(""); setPage(1); setRace(""); }
   function changeFilter(apply: () => void) {
+    setActiveBib(null);
     apply();
     setPage(1);
   }
@@ -194,7 +198,7 @@ export default function ParticipantsPage() {
         action={
           <button
             className="button"
-            disabled={!rows.length || exporting}
+            disabled={!allRows.length || exporting}
             onClick={download}
           >
             <Download size={16} aria-hidden="true" />
@@ -209,7 +213,14 @@ export default function ParticipantsPage() {
           ตามที่กรองอยู่
         </span>
       </div>
-      {writable && editableRows.length > 0 && <div className="filter-bar"><button className="button" onClick={startBib}>เริ่มกรอก BIB ต่อเนื่อง</button><span className="muted">เฉพาะผู้ชำระเงินแล้วในหน้านี้ · ใช้บันทึกและถัดไป หรือ Enter เพื่อบันทึกคนปัจจุบัน</span></div>}
+      {writable && <section className="bib-workspace" aria-label="จัดการเลข BIB">
+        <div><h2>จัดเลข BIB</h2><p>ผู้ชำระเงินแล้วที่ยังไม่มี BIB ในหน้านี้ <strong>{missingCount} คน</strong></p></div>
+        <div className="bib-workspace-actions">
+          <label className="checkbox-label"><input type="checkbox" checked={missingBibOnly} onChange={(event) => { setMissingBibOnly(event.target.checked); setActiveBib(null); }} />เฉพาะคนที่ยังไม่มี BIB ในหน้านี้</label>
+          <button className="button primary" disabled={!editableRows.length || loading} onClick={startBib}>เริ่มกรอก BIB ต่อเนื่อง</button>
+        </div>
+        <small>บันทึกและถัดไปเพื่อทำต่อ · CSV ยังคงส่งออกตามตัวกรองหลัก</small>
+      </section>}
       <section className="panel">
         <div className="filter-bar in-panel">
           <SearchField
@@ -310,7 +321,8 @@ export default function ParticipantsPage() {
               <Pager meta={data.meta} unit="คน" onPage={setPage} />
             </>
           ) : (
-            <EmptyState title="ไม่พบผู้สมัคร" action={hasFilters ? <button className="button" onClick={resetFilters}>ล้างตัวกรองทั้งหมด</button> : undefined} />
+            <><EmptyState title={missingBibOnly ? "ไม่มีผู้ชำระเงินที่ยังขาด BIB ในหน้านี้" : "ไม่พบผู้สมัคร"} action={hasFilters ? <button className="button" onClick={resetFilters}>ล้างตัวกรองทั้งหมด</button> : undefined} />
+            {missingBibOnly && data && <Pager meta={data.meta} unit="คน" onPage={(next) => { setActiveBib(null); setPage(next); }} />}</>
           ))}
       </section>
     </>

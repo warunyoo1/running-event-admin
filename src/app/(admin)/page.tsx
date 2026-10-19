@@ -7,6 +7,8 @@ import {
   ArrowUpRight,
   CalendarDays,
   Check,
+  ShoppingBag,
+  Truck,
   CircleDollarSign,
   Clock3,
   Download,
@@ -110,11 +112,16 @@ export default function DashboardPage() {
                   : "ดูจำนวนผู้สมัครและเตรียมชุดวิ่งได้เลย"}
               </p>
             </div>
-            <Link className="button primary" href="/slips">
-              ไปตรวจสลิป
+            <Link className="button primary" href={data.pendingReview > 0 ? "/slips" : "/participants"}>
+              {data.pendingReview > 0 ? "ไปตรวจสลิป" : "เตรียมรายชื่อและ BIB"}
               <ArrowRight size={17} aria-hidden="true" />
             </Link>
           </div>
+          <nav className="dashboard-next-actions" aria-label="งานที่ทำต่อได้">
+            <Link href="/orders"><ShoppingBag size={18} aria-hidden="true" /><span>ติดตามออเดอร์</span><ArrowRight size={15} aria-hidden="true" /></Link>
+            <Link href="/participants"><Users size={18} aria-hidden="true" /><span>จัดรายชื่อและ BIB</span><ArrowRight size={15} aria-hidden="true" /></Link>
+            <Link href="/shipping"><Truck size={18} aria-hidden="true" /><span>รับชุดวิ่งและจัดส่ง</span><ArrowRight size={15} aria-hidden="true" /></Link>
+          </nav>
           <div className="stats-grid">
             <StatCard
               title="ยอดเงินที่รับแล้ว"

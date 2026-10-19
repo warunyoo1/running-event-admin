@@ -269,11 +269,10 @@ function Users({ selfId }: { selfId: string }) {
         {data &&
           (filtered.length ? (
             <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม" aria-busy={loading}>
-              <table>
+              <table className="users-table">
                 <thead>
                   <tr>
                     <th>ผู้ใช้</th>
-                    <th>อีเมล</th>
                     <th>สิทธิ์ใช้งาน</th>
                     <th>สถานะ</th>
                     <th>เข้าสู่ระบบล่าสุด</th>
@@ -289,10 +288,9 @@ function Users({ selfId }: { selfId: string }) {
                         <td>
                           <div className="person-cell">
                             <span className="avatar">{u.name.slice(0, 1)}</span>
-                            <strong>{u.name}</strong>
+                            <div><strong>{u.name}{isSelf && <small className="user-self-label">คุณ</small>}</strong><small className="cell-sub">{u.email}</small></div>
                           </div>
                         </td>
-                        <td>{u.email}</td>
                         <td>{roleLabels[u.role]}</td>
                         <td>
                           <span
