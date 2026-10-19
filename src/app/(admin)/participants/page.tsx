@@ -285,9 +285,7 @@ export default function ParticipantsPage() {
                             <span className="avatar small">
                               {p.firstName.slice(0, 1)}
                             </span>
-                            <strong>
-                              {p.firstName} {p.lastName}
-                            </strong>
+                            <div><strong>{p.firstName} {p.lastName}</strong>{p.identityReference && <small className="participant-reference">รหัสอ้างอิง: {p.identityReference}</small>}</div>
                           </div>
                         </td>
                         <td>

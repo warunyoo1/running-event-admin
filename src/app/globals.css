@@ -3241,3 +3241,5 @@ input[type="checkbox"] {
 .nav-emoji { display: inline-flex; align-items: center; justify-content: center; width: 22px; flex: 0 0 22px; font-size: 19px; line-height: 1; }
 
 .event-grid + .pagination { margin-top: 24px; }
+
+.participant-reference { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; max-width: 32ch; }

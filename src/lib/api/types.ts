@@ -120,6 +120,7 @@ export type AdminParticipant = {
   gender: string;
   birthDate: string;
   nationality: string;
+  identityReference?: string;
   declineIdentity: boolean;
   idNumber: string;
   email?: string;
