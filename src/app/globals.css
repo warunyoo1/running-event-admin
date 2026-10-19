@@ -510,9 +510,19 @@ main#main {
   border-color: var(--danger);
   color: #fff;
 }
+.button.danger:hover:not(:disabled) {
+  background: #922b2b;
+  border-color: #922b2b;
+  color: #fff;
+}
 .button.danger-outline {
   color: var(--danger);
   border-color: #eac3c3;
+}
+.button.danger-outline:hover:not(:disabled) {
+  background: #fff1f1;
+  border-color: var(--danger);
+  color: #922b2b;
 }
 .button.small-button {
   min-height: 40px;
@@ -1588,6 +1598,17 @@ input[type="checkbox"] {
   gap: 10px;
   margin-bottom: 15px;
 }
+.event-contact-phone-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; gap: 12px; margin-top: 12px; }
+.event-contact-phone-row > button { margin-top: 27px; min-height: 44px; }
+.event-contact-phones > p { font-size: 13px; }
+.race-prize-editor { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
+.race-prize-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.race-prize-heading strong { font-size: 14px; font-weight: 600; }
+.race-prize-editor > p { font-size: 13px; margin-bottom: 12px; }
+.race-prize-row { display: grid; grid-template-columns: minmax(70px, 1fr) minmax(100px, 2fr) minmax(130px, 1.5fr) auto; gap: 12px; align-items: start; margin-bottom: 12px; }
+.race-prize-row > button { margin-top: 27px; min-height: 44px; }
+.race-field-row .race-prize-row > label:first-child { grid-column: auto; }
+@media (max-width: 600px) { .race-prize-heading { flex-wrap: wrap; } .race-prize-row { gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-bottom: 16px; border-bottom: 1px solid var(--line); } .race-prize-row > button { justify-self: end; } .race-prize-row > button span { display: none; } }
 .image-fields {
   display: grid;
   gap: 14px;

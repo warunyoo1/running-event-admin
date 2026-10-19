@@ -34,16 +34,21 @@ export type EventForm = {
   slug: string;
   subtitle: string;
   description: string;
+  contactPhones: string[];
+  websiteUrl: string;
+  locationUrl: string;
   date: string;
   venue: string;
+  startPoint: string;
   province: string;
   category: EventCategory | "";
   theme: EventTheme | "";
   status: EventStatus;
+  registrationStarts: string;
   registrationEnds: string;
   organizer: string;
   refundPolicy: string;
-  races: { id?: string; name: string; price: string; quota: string; start: string }[];
+  races: { id?: string; name: string; price: string; quota: string; start: string; prizes: { rank: string; amount: string; trophy: boolean }[] }[];
 };
 
 /**
@@ -58,8 +63,12 @@ export function toEventBody(form: EventForm): EventBody {
     slug: form.slug.trim().toLowerCase(),
     subtitle: form.subtitle.trim(),
     description: form.description.trim(),
+    websiteUrl: form.websiteUrl.trim(),
+    locationUrl: form.locationUrl.trim(),
+    contactPhones: form.contactPhones.map((phone) => phone.trim()).filter(Boolean),
     date: form.date,
     venue: form.venue.trim(),
+    startPoint: form.startPoint.trim(),
     province: form.province.trim(),
     status: form.status,
     organizer: form.organizer.trim(),
@@ -70,9 +79,11 @@ export function toEventBody(form: EventForm): EventBody {
       price: Number(race.price),
       quota: Number(race.quota),
       start: race.start || null,
+      prizes: race.prizes.map((prize) => ({ rank: Number(prize.rank), amount: Number(prize.amount), trophy: prize.trophy })),
     })),
     category: form.category || null,
     theme: form.theme || null,
+    registrationStarts: form.registrationStarts || null,
     registrationEnds: form.registrationEnds || null,
   };
   return body;

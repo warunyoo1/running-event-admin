@@ -13,6 +13,7 @@ import {
   Users,
   Save,
 } from "lucide-react";
+import { BuddhistDateInput } from "@/components/buddhist-date-input";
 import { DiscardChangesDialog } from "@/components/discard-changes-dialog";
 import { useAuth } from "@/features/admin/auth-provider";
 import {
@@ -84,7 +85,7 @@ type Editing = { id: string | null; original: AdminEvent | null; form: EventForm
 /** `hasOrders` is set once the API refused a hard delete with EVENT_HAS_ORDERS. */
 type Confirm = { kind: "archive" | "delete"; event: AdminEvent; hasOrders: boolean };
 
-const emptyRace = (): RaceForm => ({ name: "", price: "0", quota: "100", start: "" });
+const emptyRace = (): RaceForm => ({ name: "", price: "0", quota: "100", start: "", prizes: [] });
 
 function newEditing(): Editing {
   return {
@@ -95,16 +96,21 @@ function newEditing(): Editing {
       slug: "",
       subtitle: "",
       description: "",
+      contactPhones: [],
+      websiteUrl: "",
+      locationUrl: "",
       date: "",
       venue: "",
+      startPoint: "",
       province: "",
       category: "",
       theme: "",
       status: "draft",
+      registrationStarts: "",
       registrationEnds: "",
       organizer: "",
       refundPolicy: "",
-      races: [{ name: "5 KM", price: "399", quota: "500", start: "" }],
+      races: [{ name: "5 KM", price: "399", quota: "500", start: "", prizes: [] }],
     },
   };
 }
@@ -118,12 +124,17 @@ function editingFrom(event: AdminEvent): Editing {
       slug: event.slug,
       subtitle: event.subtitle ?? "",
       description: event.description ?? "",
+      contactPhones: event.contactPhones ?? [],
+      websiteUrl: event.websiteUrl ?? "",
+      locationUrl: event.locationUrl ?? "",
       date: event.date,
       venue: event.venue,
+      startPoint: event.startPoint ?? "",
       province: event.province ?? "",
       category: event.category ?? "",
       theme: event.theme ?? "",
       status: event.status,
+      registrationStarts: event.registrationStarts ?? "",
       registrationEnds: event.registrationEnds ?? "",
       organizer: event.organizer ?? "",
       refundPolicy: event.refundPolicy ?? "",
@@ -133,6 +144,7 @@ function editingFrom(event: AdminEvent): Editing {
         price: String(race.price),
         quota: String(race.quota),
         start: race.start ?? "",
+        prizes: (race.prizes ?? []).map((prize) => ({ rank: String(prize.rank), amount: String(prize.amount), trophy: prize.trophy ?? false })),
       })),
     },
   };
@@ -701,28 +713,48 @@ function Events() {
                 />
                 <FieldError message={fields.description} />
               </label>
+              <label className="full">ลิงก์ข้อมูลงานเพิ่มเติม (ไม่บังคับ)
+                <input type="url" maxLength={2048} placeholder="https:// เช่น เว็บไซต์งาน หรือโพสต์ประกาศจากผู้จัด" value={form.websiteUrl} aria-invalid={Boolean(fields.websiteUrl)} onChange={(e) => setForm({ websiteUrl: e.target.value })} />
+                <FieldError message={fields.websiteUrl} />
+              </label>
+              <div className="full event-contact-phones">
+                <div className="race-prize-heading"><strong>เบอร์โทรติดต่อผู้จัดงาน (ไม่บังคับ)</strong><button type="button" className="text-link" disabled={form.contactPhones.length >= 10} onClick={() => setForm({ contactPhones: [...form.contactPhones, ""] })}><Plus size={15} aria-hidden="true" />เพิ่มเบอร์โทร</button></div>
+                <FieldError message={fields.contactPhones} />
+                {!form.contactPhones.length && <p className="muted">เพิ่มได้หลายเบอร์ สำหรับให้ผู้สมัครติดต่อผู้จัดงาน</p>}
+                {form.contactPhones.map((phone, phoneIndex) => <div className="event-contact-phone-row" key={phoneIndex}>
+                  <label>เบอร์โทร {phoneIndex + 1}<input type="tel" autoComplete="off" maxLength={26} placeholder="เช่น 0812345678" value={phone} aria-invalid={Boolean(fields[`contactPhones.${phoneIndex}`])} onChange={(e) => setForm({ contactPhones: form.contactPhones.map((value, index) => index === phoneIndex ? e.target.value : value) })} /><FieldError message={fields[`contactPhones.${phoneIndex}`]} /></label>
+                  <button type="button" className="button small-button" aria-label={`ลบเบอร์โทร ${phoneIndex + 1}`} onClick={() => setForm({ contactPhones: form.contactPhones.filter((_, index) => index !== phoneIndex) })}><Trash2 size={16} aria-hidden="true" />ลบ</button>
+                </div>)}
+              </div>
               </fieldset>
               <fieldset className="event-form-section full form-grid">
                 <legend>กำหนดการและการเปิดรับสมัคร</legend>
               <label>
-                วันที่จัดงาน
-                <input
+                วันที่จัดงาน (พ.ศ.)
+                <BuddhistDateInput
                   required
-                  type="date"
                   value={form.date}
                   aria-invalid={Boolean(fields.date)}
-                  onChange={(e) => setAutoSlug({ date: e.target.value })}
+                  onChange={(value) => setAutoSlug({ date: value })}
                 />
                 <FieldError message={fields.date} />
               </label>
               <div className="field-clearable">
                 <label>
-                  วันปิดรับสมัคร
-                  <input
-                    type="date"
+                  วันเปิดรับสมัคร (พ.ศ.)
+                  <BuddhistDateInput value={form.registrationStarts} max={[form.registrationEnds, form.date].filter(Boolean).sort()[0]} aria-invalid={Boolean(fields.registrationStarts)} onChange={(value) => setForm({ registrationStarts: value })} />
+                  <FieldError message={fields.registrationStarts} />
+                </label>
+                {form.registrationStarts && <button type="button" className="text-link" onClick={() => setForm({ registrationStarts: "" })}>ล้างวันที่</button>}
+              </div>
+              <div className="field-clearable">
+                <label>
+                  วันปิดรับสมัคร (พ.ศ.)
+                  <BuddhistDateInput
                     value={form.registrationEnds}
+                    min={form.registrationStarts || undefined}
                     aria-invalid={Boolean(fields.registrationEnds)}
-                    onChange={(e) => setForm({ registrationEnds: e.target.value })}
+                    onChange={(value) => setForm({ registrationEnds: value })}
                   />
                   <FieldError message={fields.registrationEnds} />
                 </label>
@@ -799,6 +831,17 @@ function Events() {
                   onChange={(e) => setForm({ venue: e.target.value })}
                 />
                 <FieldError message={fields.venue} />
+                <span className="field-hint">ชื่อสถานที่จัดงาน</span>
+              </label>
+              <label className="full">ลิงก์สถานที่ / แผนที่ (ไม่บังคับ)
+                <input type="url" maxLength={2048} placeholder="https:// เช่น ลิงก์แชร์จาก Google Maps" value={form.locationUrl} aria-invalid={Boolean(fields.locationUrl)} onChange={(e) => setForm({ locationUrl: e.target.value })} />
+                <FieldError message={fields.locationUrl} />
+                <small className="muted">หากไม่ใส่ ระบบจะค้นหาแผนที่จากชื่อสถานที่</small>
+              </label>
+              <label className="full">
+                จุดปล่อยตัว (ไม่บังคับ)
+                <input maxLength={300} placeholder="เช่น ประตูทางเข้าหลัก หรือบริเวณลานหน้าอาคาร" value={form.startPoint} aria-invalid={Boolean(fields.startPoint)} onChange={(e) => setForm({ startPoint: e.target.value })} />
+                <FieldError message={fields.startPoint} />
               </label>
               <label>
                 จังหวัด
@@ -900,6 +943,20 @@ function Events() {
                             ล้างเวลา
                           </button>
                         )}
+                      </div>
+                      <div className="race-prize-editor">
+                        <div className="race-prize-heading"><strong>อันดับและรางวัล · {race.name || "ระยะนี้"}</strong><button type="button" className="text-link" disabled={race.prizes.length >= 100} onClick={() => {
+                          const nextRank = Array.from({ length: 100 }, (_, i) => i + 1).find((rank) => !race.prizes.some((prize) => Number(prize.rank) === rank));
+                          if (nextRank) setRace(index, { prizes: [...race.prizes, { rank: String(nextRank), amount: "", trophy: false }] });
+                        }}><Plus size={15} aria-hidden="true" />เพิ่มอันดับ</button></div>
+                        {!race.prizes.length && <p className="muted">ยังไม่กำหนดรางวัลสำหรับระยะนี้</p>}
+                        <FieldError message={fields[`races.${index}.prizes`]} />
+                        {race.prizes.map((prize, prizeIndex) => <div className="race-prize-row" key={prizeIndex}>
+                          <label>อันดับ<input type="number" min="1" max="100" step="1" required value={prize.rank} aria-invalid={Boolean(fields[`races.${index}.prizes.${prizeIndex}.rank`])} onChange={(e) => setRace(index, { prizes: race.prizes.map((row, i) => i === prizeIndex ? { ...row, rank: e.target.value } : row) })} /><FieldError message={fields[`races.${index}.prizes.${prizeIndex}.rank`]} /></label>
+                          <label>เงินรางวัล (บาท)<input type="number" min="0" step="1" required value={prize.amount} aria-invalid={Boolean(fields[`races.${index}.prizes.${prizeIndex}.amount`])} onChange={(e) => setRace(index, { prizes: race.prizes.map((row, i) => i === prizeIndex ? { ...row, amount: e.target.value } : row) })} /><FieldError message={fields[`races.${index}.prizes.${prizeIndex}.amount`]} /></label>
+                          <label>ถ้วยรางวัล<select value={prize.trophy ? "yes" : "no"} onChange={(e) => setRace(index, { prizes: race.prizes.map((row, i) => i === prizeIndex ? { ...row, trophy: e.target.value === "yes" } : row) })}><option value="no">ไม่ได้รับถ้วย</option><option value="yes">ได้รับถ้วย</option></select></label>
+                          <button type="button" className="button small-button" aria-label={`ลบอันดับ ${prize.rank || prizeIndex + 1} ของระยะ ${race.name}`} onClick={() => setRace(index, { prizes: race.prizes.filter((_, i) => i !== prizeIndex) })}><Trash2 size={16} aria-hidden="true" /><span>ลบ</span></button>
+                        </div>)}
                       </div>
                       {!race.id && form.races.length > 1 && (
                         <button

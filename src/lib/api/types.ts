@@ -50,6 +50,7 @@ export type Race = {
   price: number;
   quota: number;
   start: string | null;
+  prizes?: { rank: number; amount: number; trophy?: boolean }[];
   remaining: number;
 };
 export type EventImage = {
@@ -73,12 +74,17 @@ export type AdminEvent = {
   slug: string;
   subtitle?: string;
   description?: string;
+  contactPhones?: string[];
+  websiteUrl?: string;
+  locationUrl?: string;
   date: string;
   venue: string;
+  startPoint?: string;
   province?: string;
   category?: EventCategory;
   theme?: EventTheme;
   status: EventStatus;
+  registrationStarts?: string;
   registrationEnds?: string;
   organizer?: string;
   refundPolicy?: string;
@@ -295,20 +301,26 @@ export type RaceBody = {
   quota: number;
   /** `null` clears the start time. */
   start?: string | null;
+  prizes?: { rank: number; amount: number; trophy?: boolean }[];
 };
 export type EventBody = {
   name: string;
   slug: string;
   subtitle?: string;
   description?: string;
+  contactPhones?: string[];
+  websiteUrl?: string;
+  locationUrl?: string;
   date: string;
   venue: string;
+  startPoint?: string;
   province?: string;
   /** `null` resets to the API default. */
   category?: EventCategory | null;
   theme?: EventTheme | null;
   status: EventStatus;
   /** `null` clears the date. */
+  registrationStarts?: string | null;
   registrationEnds?: string | null;
   organizer?: string;
   refundPolicy?: string;
