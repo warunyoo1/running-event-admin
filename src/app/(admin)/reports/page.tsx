@@ -167,7 +167,7 @@ export default function ReportsPage() {
           </div>
           {summary.data &&
             (rows.length ? (
-              <div className="table-scroll" aria-busy={summary.loading}>
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม" aria-busy={summary.loading}>
                 <table>
                   <thead>
                     <tr>

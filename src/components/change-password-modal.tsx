@@ -65,10 +65,11 @@ export function ChangePasswordModal({
               maxLength={MAX_PASSWORD}
               value={currentPassword}
               aria-invalid={Boolean(fields.currentPassword)}
+            aria-describedby={fields.currentPassword ? "change-currentPassword-error" : undefined}
               onChange={(e) => setCurrent(e.target.value)}
             />
             {fields.currentPassword && (
-              <span className="form-error">{fields.currentPassword}</span>
+              <span className="form-error" id="change-currentPassword-error">{fields.currentPassword}</span>
             )}
           </label>
           <label className="full">
@@ -81,9 +82,10 @@ export function ChangePasswordModal({
               maxLength={MAX_PASSWORD}
               value={newPassword}
               aria-invalid={Boolean(fields.newPassword)}
+            aria-describedby={fields.newPassword ? "change-newPassword-error" : undefined}
               onChange={(e) => setNew(e.target.value)}
             />
-            {fields.newPassword && <span className="form-error">{fields.newPassword}</span>}
+            {fields.newPassword && <span className="form-error" id="change-newPassword-error">{fields.newPassword}</span>}
           </label>
         </div>
         <div className="modal-actions">

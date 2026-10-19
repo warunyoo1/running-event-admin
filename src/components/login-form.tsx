@@ -34,7 +34,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={submit} noValidate>
+    <form onSubmit={submit}>
       <div className="form-grid">
         {error && (
           <p className="form-error full" role="alert">
@@ -51,9 +51,10 @@ export function LoginForm() {
             maxLength={200}
             value={email}
             aria-invalid={Boolean(fields.email)}
+            aria-describedby={fields.email ? "login-email-error" : undefined}
             onChange={(e) => setEmail(e.target.value)}
           />
-          {fields.email && <span className="form-error">{fields.email}</span>}
+          {fields.email && <span className="form-error" id="login-email-error">{fields.email}</span>}
         </label>
         <label className="full">
           รหัสผ่าน
@@ -64,9 +65,10 @@ export function LoginForm() {
             maxLength={200}
             value={password}
             aria-invalid={Boolean(fields.password)}
+            aria-describedby={fields.password ? "login-password-error" : undefined}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {fields.password && <span className="form-error">{fields.password}</span>}
+          {fields.password && <span className="form-error" id="login-password-error">{fields.password}</span>}
         </label>
       </div>
       <button className="button primary" type="submit" disabled={pending}>

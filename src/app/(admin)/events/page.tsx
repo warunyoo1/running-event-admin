@@ -248,6 +248,14 @@ function Events() {
   const [slugSuggestion, setSlugSuggestion] = useState("");
   const slugSuffix = useRef("");
   const staged = useStagedImages();
+  const initialForm = useRef("");
+  const dirty = Boolean(editing && (JSON.stringify(editing.form) !== initialForm.current || staged.items.length));
+  useEffect(() => {
+    if (!dirty && !pending) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty, pending]);
   const deepLinked = useRef(false);
   const q = useDebounced(query.trim());
   const { data, error: loadError, loading, reload } = useAsync(
@@ -262,7 +270,11 @@ function Events() {
     if (!canEdit || !ready || !wanted || deepLinked.current) return;
     deepLinked.current = true;
     const found = scopeEvents.find((event) => event.id === wanted);
-    if (found) setEditing(editingFrom(found));
+    if (found) {
+      const next = editingFrom(found);
+      initialForm.current = JSON.stringify(next.form);
+      setEditing(next);
+    }
   }, [searchParams, canEdit, ready, scopeEvents]);
 
   function open(next: Editing) {
@@ -274,9 +286,12 @@ function Events() {
     setSlugTouched(false);
     setSlugSuggestion("");
     slugSuffix.current = randomSuffix();
+    initialForm.current = JSON.stringify(next.form);
     setEditing(next);
   }
   function close() {
+    if (pending) return;
+    if (dirty && !window.confirm("มีข้อมูลที่ยังไม่ได้บันทึก ต้องการทิ้งการแก้ไขและปิดหน้าต่างหรือไม่?")) return;
     staged.clear();
     setUploadStatus("");
     setUploadFailures([]);
@@ -398,7 +413,9 @@ function Events() {
           );
           staged.clear();
         }
-        setEditing(editingFrom(created));
+        const next = editingFrom(created);
+        initialForm.current = JSON.stringify(next.form);
+        setEditing(next);
       }
       reload();
       reloadEvents();

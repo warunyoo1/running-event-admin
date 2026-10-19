@@ -97,15 +97,18 @@ export function SearchField({
 export function EmptyState({
   title = "ไม่พบข้อมูล",
   description = "ลองเปลี่ยนคำค้นหาหรือตัวกรองอีกครั้ง",
+  action,
 }: {
   title?: string;
   description?: string;
+  action?: ReactNode;
 }) {
   return (
     <div className="empty-state">
       <Inbox size={32} aria-hidden="true" />
       <h2>{title}</h2>
       <p>{description}</p>
+      {action}
     </div>
   );
 }
@@ -163,7 +166,7 @@ export function Modal({
       ref={ref}
       className={`modal ${wide ? "modal-wide" : ""}`}
       aria-labelledby={id}
-      onCancel={onClose}
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -214,13 +217,7 @@ export function EventArtwork({
           ))}
         </g>
       </svg>
-      <span>
-        {theme === "green"
-          ? "TRAIL / 2027"
-          : theme === "blue"
-            ? "SUNSET / 2027"
-            : "MORNING / 2027"}
-      </span>
+
     </div>
   );
 }

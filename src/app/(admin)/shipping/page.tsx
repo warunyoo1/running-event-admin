@@ -242,8 +242,8 @@ export default function ShippingPage() {
           {data &&
             (data.data.length ? (
               <>
-                <div className="table-scroll" aria-busy={loading}>
-                  <table>
+                <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม" aria-busy={loading}>
+                  <table className={tab === "pickup" ? "pickup-table" : undefined}>
                     <thead>
                       <tr>
                         <th>เลขออเดอร์</th>
@@ -252,7 +252,7 @@ export default function ShippingPage() {
                             ? "ผู้สมัคร / ไซซ์เสื้อ"
                             : "ผู้ติดต่อ / ที่อยู่จัดส่ง"}
                         </th>
-                        <th>{tab === "pickup" ? "รับชุดวิ่งแล้วหรือยัง" : "เลขพัสดุ"}</th>
+                        {tab !== "pickup" && <th>เลขพัสดุ</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -268,6 +268,23 @@ export default function ShippingPage() {
                                     {p.race} · เสื้อ {p.size} · เลข BIB{" "}
                                     {p.bibNo || "ยังไม่ระบุ"}
                                   </small>
+                                <label
+                                  className="checkbox-label pickup-check"
+                                  key={p.id}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`รับชุดวิ่ง: ${p.name} · ${order.orderNo}`}
+                                    checked={p.collected}
+                                    disabled={!writable || busyId === p.id}
+                                    onChange={() =>
+                                      toggleCollected(p.id, p.collected)
+                                    }
+                                  />
+                                  {p.collected
+                                    ? "รับชุดวิ่งแล้ว"
+                                    : "ยังไม่ได้รับชุดวิ่ง"}
+                                </label>
                                 </div>
                               ))
                             ) : (
@@ -281,27 +298,8 @@ export default function ShippingPage() {
                               </>
                             )}
                           </td>
-                          <td>
-                            {tab === "pickup" ? (
-                              order.participants.map((p) => (
-                                <label
-                                  className="checkbox-label pickup-check"
-                                  key={p.id}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={p.collected}
-                                    disabled={!writable || busyId === p.id}
-                                    onChange={() =>
-                                      toggleCollected(p.id, p.collected)
-                                    }
-                                  />
-                                  {p.collected
-                                    ? "รับชุดวิ่งแล้ว"
-                                    : "ยังไม่ได้รับชุดวิ่ง"}
-                                </label>
-                              ))
-                            ) : writable ? (
+                          {tab !== "pickup" && <td>
+                            {writable ? (
                               <button
                                 className="text-link"
                                 onClick={() => setEditing(order)}
@@ -317,7 +315,7 @@ export default function ShippingPage() {
                                   : "–"}
                               </span>
                             )}
-                          </td>
+                          </td>}
                         </tr>
                       ))}
                     </tbody>

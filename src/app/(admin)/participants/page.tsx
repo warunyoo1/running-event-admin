@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Check, Download, Pencil, Users, X } from "lucide-react";
 import { useAuth } from "@/features/admin/auth-provider";
 import { canWrite } from "@/features/admin/permissions";
@@ -30,10 +30,16 @@ function BibCell({
   participant,
   editable,
   onSaved,
+  active = false,
+  hasNext = false,
+  onCancel,
 }: {
   participant: ParticipantRow;
   editable: boolean;
-  onSaved: () => void;
+  onSaved: (advance: boolean) => void;
+  active?: boolean;
+  hasNext?: boolean;
+  onCancel: () => void;
 }) {
   const notify = useToast();
   const [editing, setEditing] = useState(false);
@@ -41,8 +47,14 @@ function BibCell({
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
+  useEffect(() => {
+    if (active) { setValue(participant.bibNo ?? ""); setError(""); setEditing(true); }
+  }, [active, participant.bibNo]);
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
+    const advance = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("data-next") === "true";
     setPending(true);
     setError("");
     try {
@@ -52,7 +64,7 @@ function BibCell({
       });
       notify("บันทึกเลข BIB แล้ว");
       setEditing(false);
-      onSaved();
+      onSaved(advance);
     } catch (failure) {
       setError(fieldErrorsFor(failure).bibNo || errorMessage(failure));
     } finally {
@@ -87,7 +99,8 @@ function BibCell({
           autoFocus
           value={value}
           maxLength={BIB_MAX}
-          aria-label="เลข BIB"
+          aria-label={`เลข BIB ของ ${participant.firstName} ${participant.lastName}`}
+          disabled={pending}
           aria-invalid={Boolean(error)}
           onChange={(e) => setValue(e.target.value)}
         />
@@ -99,12 +112,13 @@ function BibCell({
         >
           <Check size={15} />
         </button>
+        {hasNext && <button className="button small-button" type="submit" data-next="true" disabled={pending}>บันทึกและถัดไป</button>}
         <button
           className="icon-button"
           type="button"
           disabled={pending}
           aria-label="ยกเลิกการแก้ไข"
-          onClick={() => setEditing(false)}
+          onClick={() => { setEditing(false); onCancel(); }}
         >
           <X size={15} />
         </button>
@@ -127,6 +141,7 @@ export default function ParticipantsPage() {
   const [status, setStatus] = useState<OrderStatus | "">("");
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
+  const [activeBib, setActiveBib] = useState<string | null>(null);
   const q = useDebounced(query.trim());
   const filters = { eventId: scopeEventId, q, race, status };
   const { data, error, loading, reload } = useAsync(
@@ -146,6 +161,11 @@ export default function ParticipantsPage() {
     ),
   ];
   const writable = canWrite(user.role);
+  const editableRows = rows.filter((row) => row.orderStatus === "paid");
+  function startBib() {
+    const next = editableRows.find((row) => !row.bibNo) ?? editableRows[0];
+    if (next) setActiveBib(next.id);
+  }
 
   async function download() {
     setExporting(true);
@@ -160,6 +180,8 @@ export default function ParticipantsPage() {
       setExporting(false);
     }
   }
+  const hasFilters = Boolean(query || status || race);
+  function resetFilters() { setQuery(""); setStatus(""); setPage(1); setRace(""); }
   function changeFilter(apply: () => void) {
     apply();
     setPage(1);
@@ -187,6 +209,7 @@ export default function ParticipantsPage() {
           ตามที่กรองอยู่
         </span>
       </div>
+      {writable && editableRows.length > 0 && <div className="filter-bar"><button className="button" onClick={startBib}>เริ่มกรอก BIB ต่อเนื่อง</button><span className="muted">เฉพาะผู้ชำระเงินแล้วในหน้านี้ · ใช้บันทึกและถัดไป หรือ Enter เพื่อบันทึกคนปัจจุบัน</span></div>}
       <section className="panel">
         <div className="filter-bar in-panel">
           <SearchField
@@ -225,12 +248,13 @@ export default function ParticipantsPage() {
             </select>
           </label>
         </div>
+        {hasFilters && <div className="filter-bar in-panel"><button className="button" onClick={resetFilters}>ล้างตัวกรองทั้งหมด</button><span className="muted">กำลังแสดงผลตามตัวกรองที่เลือก</span></div>}
         {error && <ErrorState message={error} onRetry={reload} />}
         {!data && loading && <LoadingState />}
         {data &&
           (rows.length ? (
             <>
-              <div className="table-scroll" aria-busy={loading}>
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม" aria-busy={loading}>
                 <table>
                   <thead>
                     <tr>
@@ -264,7 +288,14 @@ export default function ParticipantsPage() {
                             key={`${p.id}-${p.bibNo ?? ""}`}
                             participant={p}
                             editable={writable && p.orderStatus === "paid"}
-                            onSaved={reload}
+                            onCancel={() => setActiveBib(null)}
+                            active={activeBib === p.id}
+                            hasNext={editableRows.findIndex((row) => row.id === p.id) < editableRows.length - 1}
+                            onSaved={(advance) => {
+                              const index = editableRows.findIndex((row) => row.id === p.id);
+                              setActiveBib(advance ? editableRows[index + 1]?.id ?? null : null);
+                              reload();
+                            }}
                           />
                         </td>
                         <td className="muted">{p.orderNo}</td>
@@ -279,7 +310,7 @@ export default function ParticipantsPage() {
               <Pager meta={data.meta} unit="คน" onPage={setPage} />
             </>
           ) : (
-            <EmptyState title="ไม่พบผู้สมัคร" />
+            <EmptyState title="ไม่พบผู้สมัคร" action={hasFilters ? <button className="button" onClick={resetFilters}>ล้างตัวกรองทั้งหมด</button> : undefined} />
           ))}
       </section>
     </>

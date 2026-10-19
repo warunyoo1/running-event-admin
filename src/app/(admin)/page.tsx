@@ -153,7 +153,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               {data.races.length ? (
-                <div className="table-scroll">
+                <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม">
                   <table>
                     <thead>
                       <tr>
@@ -266,7 +266,7 @@ export default function DashboardPage() {
         {!recent.data && recent.loading && <LoadingState />}
         {recent.data &&
           (recentOrders.length ? (
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม">
               <table className="table-mobile-cards" role="table">
                 <thead>
                   <tr>

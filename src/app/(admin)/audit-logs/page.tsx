@@ -163,7 +163,7 @@ function AuditLogs() {
         {data &&
           (rows.length ? (
             <>
-              <div className="table-scroll" aria-busy={loading}>
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม" aria-busy={loading}>
                 <table className="table-mobile-cards" role="table">
                   <thead>
                     <tr>

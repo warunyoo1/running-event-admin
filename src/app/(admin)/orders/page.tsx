@@ -65,6 +65,8 @@ function Orders() {
       setExporting(false);
     }
   }
+  const hasFilters = Boolean(query || status || from || to);
+  function resetFilters() { setQuery(""); setStatus(""); setPage(1); setFrom(""); setTo(""); }
   function changeFilter(apply: () => void) {
     apply();
     setPage(1);
@@ -108,8 +110,8 @@ function Orders() {
               ))}
             </select>
           </label>
-          <label>
-            <span className="sr-only">สมัครตั้งแต่วันที่</span>
+          <label className="filter-date">
+            <span>สมัครตั้งแต่วันที่</span>
             <input
               type="date"
               value={from}
@@ -117,8 +119,8 @@ function Orders() {
               onChange={(e) => changeFilter(() => setFrom(e.target.value))}
             />
           </label>
-          <label>
-            <span className="sr-only">สมัครถึงวันที่</span>
+          <label className="filter-date">
+            <span>สมัครถึงวันที่</span>
             <input
               type="date"
               value={to}
@@ -130,12 +132,13 @@ function Orders() {
             {data ? `${data.meta.total} ออเดอร์` : ""}
           </span>
         </div>
+        {hasFilters && <div className="filter-bar in-panel"><button className="button" onClick={resetFilters}>ล้างตัวกรองทั้งหมด</button><span className="muted">กำลังแสดงผลตามตัวกรองที่เลือก</span></div>}
         {error && <ErrorState message={error} onRetry={reload} />}
         {!data && loading && <LoadingState />}
         {data &&
           (rows.length ? (
             <>
-              <div className="table-scroll" aria-busy={loading}>
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม" aria-busy={loading}>
                 <table className="table-mobile-cards" role="table">
                   <thead>
                     <tr>
@@ -211,7 +214,7 @@ function Orders() {
               <Pager meta={data.meta} unit="ออเดอร์" onPage={setPage} />
             </>
           ) : (
-            <EmptyState title="ไม่พบออเดอร์" />
+            <EmptyState title="ไม่พบออเดอร์" action={hasFilters ? <button className="button" onClick={resetFilters}>ล้างตัวกรองทั้งหมด</button> : undefined} />
           ))}
       </div>
       {selected && (
