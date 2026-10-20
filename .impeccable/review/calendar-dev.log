@@ -1,0 +1,9 @@
+▲ Next.js 16.4.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://26.238.224.26:3000
+- Environments: .env.local
+✓ Ready in 470ms
+✓ Running next.config.ts took 31ms
+
+ GET /login?next=%2Fevents 200 in 215ms (next.js: 58ms, application-code: 157ms)
+ GET /events 200 in 139ms (next.js: 113ms, proxy.ts: 6ms, application-code: 20ms)

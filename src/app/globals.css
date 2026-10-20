@@ -3243,3 +3243,22 @@ input[type="checkbox"] {
 .event-grid + .pagination { margin-top: 24px; }
 
 .participant-reference { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; max-width: 32ch; }
+.buddhist-date-field { position: relative; min-width: 0; }
+.buddhist-date-field > input { width: 100%; padding-right: 46px; }
+.date-calendar-trigger { position: absolute; right: 4px; top: 4px; width: 36px; height: 36px; border: 0; border-radius: 6px; display: grid; place-items: center; background: transparent; color: var(--muted); cursor: pointer; }
+.date-calendar-trigger:hover { background: var(--primary-soft); color: var(--primary); }
+.buddhist-calendar { position: fixed; inset: auto; margin: 0; width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 12px 32px rgb(32 44 59 / .16); }
+.buddhist-calendar-heading { display: grid; grid-template-columns: 28px minmax(0, 1fr) 86px 28px; align-items: center; gap: 4px; margin-bottom: 14px; }
+.buddhist-calendar-heading select { width: 100%; min-width: 0; padding: 7px 3px; min-height: 36px; height: 36px; font-size: 13px; }
+.buddhist-calendar button { font: inherit; cursor: pointer; }
+.buddhist-calendar-heading button { display: grid; place-items: center; height: 34px; border: 0; background: transparent; color: var(--muted); border-radius: 6px; }
+.buddhist-calendar-weekdays, .buddhist-calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center; }
+.buddhist-calendar-weekdays { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+.buddhist-calendar-days button { min-width: 0; height: 36px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.buddhist-calendar-days button:hover:not(:disabled), .buddhist-calendar-heading button:hover:not(:disabled) { background: var(--primary-soft); color: var(--primary); }
+.buddhist-calendar-days button[aria-current="date"] { box-shadow: inset 0 0 0 1px var(--primary); }
+.buddhist-calendar-days button[aria-pressed="true"] { background: var(--primary); color: white; }
+.buddhist-calendar button:disabled { opacity: .35; cursor: not-allowed; }
+.buddhist-calendar-actions { display: flex; gap: 8px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border); }
+.buddhist-calendar-actions button { padding: 6px 8px; min-height: 34px; background: transparent; border: 0; color: var(--primary); border-radius: 6px; font-size: 13px; }
+.buddhist-calendar-actions button:last-child { margin-left: auto; color: var(--muted); }
