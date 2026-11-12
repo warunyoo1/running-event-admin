@@ -265,13 +265,19 @@ export function useStagedImages() {
       return current.filter((i) => i.key !== key);
     });
   }, []);
+  /** Swaps with the nearest neighbour of the same kind, so each kind group keeps its own order. */
   const move = useCallback((key: string, step: -1 | 1) => {
     setItems((current) => {
-      const from = current.findIndex((i) => i.key === key);
-      const to = from + step;
-      if (from < 0 || to < 0 || to >= current.length) return current;
+      const index = current.findIndex((i) => i.key === key);
+      if (index < 0) return current;
+      const kind = current[index].kind;
+      const sameKind = current.map((i, p) => ({ i, p })).filter(({ i }) => i.kind === kind);
+      const position = sameKind.findIndex(({ i }) => i.key === key);
+      const neighbourEntry = sameKind[position + step];
+      if (!neighbourEntry) return current;
+      const neighbour = neighbourEntry.p;
       const next = [...current];
-      [next[from], next[to]] = [next[to], next[from]];
+      [next[index], next[neighbour]] = [next[neighbour], next[index]];
       return next;
     });
   }, []);
@@ -301,6 +307,14 @@ export function StagedImagesSection({
   const [kind, setKind] = useState<EventImageKind>("cover");
   const [alt, setAlt] = useState("");
   const { items } = staged;
+  const stagedGroups = useMemo(
+    () =>
+      EVENT_IMAGE_KINDS.map((kind) => ({
+        kind,
+        items: staged.items.filter((item) => item.kind === kind),
+      })).filter((group) => group.items.length > 0),
+    [staged.items],
+  );
   return (
     <fieldset className="full race-fields image-fields" aria-busy={busy}>
       <legend>รูปภาพ</legend>
@@ -336,71 +350,78 @@ export function StagedImagesSection({
       {items.length === 0 ? (
         <p className="muted">ยังไม่ได้เลือกรูป (ข้ามได้ เพิ่มทีหลังได้)</p>
       ) : (
-        <ul className="image-grid" aria-label="รูปที่รออัปโหลด">
-          {items.map((item, index) => {
-            const label = `${EVENT_IMAGE_KIND_LABELS[item.kind]} ${item.file.name}`;
-            return (
-              <li className="image-card" key={item.key}>
-                <div className="image-thumb">
-                  {/* Plain <img>: local blob URL, not optimizable by next/image. */}
-                  <img src={item.url} alt={item.alt || item.file.name} width={320} height={240} />
-                </div>
-                <label htmlFor={`${ids}-${item.key}-kind`}>ประเภท</label>
-                <select
-                  id={`${ids}-${item.key}-kind`}
-                  value={item.kind}
-                  disabled={busy}
-                  onChange={(e) => staged.update(item.key, { kind: e.target.value as EventImageKind })}
-                >
-                  {EVENT_IMAGE_KINDS.map((value) => (
-                    <option value={value} key={value}>
-                      {EVENT_IMAGE_KIND_LABELS[value]}
-                    </option>
-                  ))}
-                </select>
-                <label htmlFor={`${ids}-${item.key}-alt`}>คำอธิบาย</label>
-                <input
-                  id={`${ids}-${item.key}-alt`}
-                  value={item.alt}
-                  maxLength={EVENT_IMAGE_ALT_MAX}
-                  disabled={busy}
-                  onChange={(e) => staged.update(item.key, { alt: e.target.value })}
-                  onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
-                />
-                <div className="image-actions">
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={`เลื่อน ${label} ขึ้น`}
-                    disabled={busy || index === 0}
-                    onClick={() => staged.move(item.key, -1)}
-                  >
-                    <ArrowUp size={18} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={`เลื่อน ${label} ลง`}
-                    disabled={busy || index === items.length - 1}
-                    onClick={() => staged.move(item.key, 1)}
-                  >
-                    <ArrowDown size={18} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="button small-button danger-outline"
-                    aria-label={`เอา ${label} ออก`}
-                    disabled={busy}
-                    onClick={() => staged.remove(item.key)}
-                  >
-                    <Trash2 size={15} aria-hidden="true" />
-                    เอาออก
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        stagedGroups.map((group) => (
+          <section className="image-group" key={group.kind} aria-labelledby={`${ids}-g-${group.kind}`}>
+            <h3 id={`${ids}-g-${group.kind}`}>
+              {EVENT_IMAGE_KIND_LABELS[group.kind]} <span>({group.items.length})</span>
+            </h3>
+            <ul className="image-grid" aria-label={`รูปที่รออัปโหลด: ${EVENT_IMAGE_KIND_LABELS[group.kind]}`}>
+              {group.items.map((item, index) => {
+                const label = `${EVENT_IMAGE_KIND_LABELS[item.kind]} ${item.file.name}`;
+                return (
+                  <li className="image-card" key={item.key}>
+                    <div className="image-thumb">
+                      {/* Plain <img>: local blob URL, not optimizable by next/image. */}
+                      <img src={item.url} alt={item.alt || item.file.name} width={320} height={240} />
+                    </div>
+                    <label htmlFor={`${ids}-${item.key}-kind`}>ประเภท</label>
+                    <select
+                      id={`${ids}-${item.key}-kind`}
+                      value={item.kind}
+                      disabled={busy}
+                      onChange={(e) => staged.update(item.key, { kind: e.target.value as EventImageKind })}
+                    >
+                      {EVENT_IMAGE_KINDS.map((value) => (
+                        <option value={value} key={value}>
+                          {EVENT_IMAGE_KIND_LABELS[value]}
+                        </option>
+                      ))}
+                    </select>
+                    <label htmlFor={`${ids}-${item.key}-alt`}>คำอธิบาย</label>
+                    <input
+                      id={`${ids}-${item.key}-alt`}
+                      value={item.alt}
+                      maxLength={EVENT_IMAGE_ALT_MAX}
+                      disabled={busy}
+                      onChange={(e) => staged.update(item.key, { alt: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+                    />
+                    <div className="image-actions">
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`เลื่อน ${label} ขึ้น`}
+                        disabled={busy || index === 0}
+                        onClick={() => staged.move(item.key, -1)}
+                      >
+                        <ArrowUp size={18} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`เลื่อน ${label} ลง`}
+                        disabled={busy || index === group.items.length - 1}
+                        onClick={() => staged.move(item.key, 1)}
+                      >
+                        <ArrowDown size={18} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="button small-button danger-outline"
+                        aria-label={`เอา ${label} ออก`}
+                        disabled={busy}
+                        onClick={() => staged.remove(item.key)}
+                      >
+                        <Trash2 size={15} aria-hidden="true" />
+                        เอาออก
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))
       )}
     </fieldset>
   );
